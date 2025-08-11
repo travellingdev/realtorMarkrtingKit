@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useUser } from '@/app/providers/UserProvider';
 import { openCheckout } from '@/lib/billing';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
 export default function UserMenu() {
   const { user, quota, plan, refresh } = useUser();
@@ -41,7 +42,20 @@ export default function UserMenu() {
           <a href="/usage" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10" role="menuitem">Usage & Plan</a>
           <button onClick={async()=>{ const r = await openCheckout('PRO'); if(r.upgraded) setOpen(false); }} className="w-full text-left rounded-lg px-3 py-2 text-sm hover:bg-white/10" role="menuitem">Upgrade</button>
           <a href="/support" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10" role="menuitem">Support</a>
+          <a href="/billing" className="block rounded-lg px-3 py-2 text-sm hover:bg-white/10" role="menuitem">Billing</a>
           <div className="mx-2 my-2 h-px bg-white/10" />
+          <button
+            onClick={async () => {
+              const sb = supabaseBrowser();
+              await sb.auth.signOut();
+              setOpen(false);
+              refresh();
+            }}
+            className="w-full text-left rounded-lg px-3 py-2 text-sm hover:bg-white/10"
+            role="menuitem"
+          >
+            Sign out
+          </button>
           <div className="px-3 pb-2 text-xs text-white/60">Free kits: {Math.min(used, limit)} / {limit}</div>
         </div>
       )}
