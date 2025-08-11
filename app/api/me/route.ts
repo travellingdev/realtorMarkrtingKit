@@ -8,7 +8,7 @@ export async function GET() {
   const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
   const freeLimit = 2 + (profile?.quota_extra || 0);
   return NextResponse.json({
-    user,
+    user: { ...user, avatar_url: profile?.avatar_url || null },
     quota: { used: profile?.quota_used || 0, limit: freeLimit, extraUnlocked: (profile?.quota_extra || 0) > 0 },
     plan: profile?.plan || 'FREE',
   });

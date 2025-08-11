@@ -4,8 +4,14 @@ import useSWR, { mutate } from 'swr';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
 type Quota = { used: number; limit: number; extraUnlocked: boolean } | null;
+interface User {
+  email?: string | null;
+  avatar_url?: string | null;
+  [key: string]: any;
+}
+
 type UserState = {
-  user: any | null;
+  user: User | null;
   plan: string | null;
   quota: Quota;
   loading: boolean;
