@@ -27,9 +27,12 @@ import Hero from "./components/Hero";
 import InstantDemoForm from "./components/InstantDemoForm";
 import OutputsSection from "./components/OutputsSection";
 import PaywallBanner from "./components/PaywallBanner";
+import Pricing from "./components/Pricing";
 import { buildPayloadFromForm } from "@/lib/payloadBuilder";
 import { loadRazorpaySdk } from "@/lib/loadRazorpay";
 import { saveIntent, readIntent, clearIntent } from "@/lib/intent";
+import AuthModal from "./components/AuthModal";
+import SurveyModal from "./components/SurveyModal";
 
 // ======================================================
 // Realtor's AI Marketing Kit – Single-file React page
@@ -621,7 +624,11 @@ export default function RealtorsAIMarketingKit() {
         handleReveal={handleReveal}
         kitSample={kitSample}
         isLoggedIn={isLoggedIn}
+        kitStatus={kitStatus}
       />
+
+      {/* TODO: Add Personalization and FAQ sections from prototype */}
+      <Pricing />
 
       {/* Paywall banner */}
       <div className="mx-auto max-w-7xl px-4">
@@ -652,76 +659,4 @@ export default function RealtorsAIMarketingKit() {
   );
 }
 
-// ===================== UI Building Blocks ===================== //
-
-// GradientDecoration now imported as a component
-
-// Minimal stubs for Auth & Survey (same behavior)
-function AuthModal({ open, onClose, onSuccess }:{open:boolean; onClose:()=>void; onSuccess:()=>void}){
-  if(!open) return null;
-  return <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-    <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-neutral-900/90 p-6">
-      <div className="text-lg font-semibold">Sign in to continue</div>
-      <p className="mt-1 text-sm text-white/70">Copy & download are unlocked after a quick sign-in.</p>
-      <div className="mt-5 space-y-3">
-        <button onClick={async()=>{
-          try {
-            const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-            const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-            if (!url || !key) {
-              alert('Missing Supabase env vars. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
-              return;
-            }
-            const sb = supabaseBrowser();
-            const { data, error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
-            if (error) {
-              alert(`Google sign-in error: ${error.message}`);
-              return;
-            }
-            if (data?.url) {
-              window.location.href = data.url;
-              return;
-            }
-            // Fallback: let caller refresh state
-            onSuccess();
-          } catch (e:any) {
-            alert(`Google sign-in failed`);
-          }
-        }} className="w-full rounded-2xl bg-white text-neutral-900 px-4 py-2 font-semibold hover:opacity-90">Continue with Google</button>
-        <button onClick={async()=>{
-          const email = prompt('Enter your email for magic link');
-          if(!email) return;
-          const sb = supabaseBrowser();
-          const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } });
-          if (!error) alert('Magic link sent. Check your email.');
-        }} className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2 hover:bg-white/10">Email magic link</button>
-      </div>
-      <button onClick={onClose} className="mt-4 w-full text-center text-sm text-white/60 hover:text-white">Maybe later</button>
-    </div>
-  </div>;
-}
-
-function SurveyModal({ open, onClose, onSubmit }:{open:boolean; onClose:()=>void; onSubmit:()=>void}){
-  const [answer, setAnswer] = useState('');
-  if(!open) return null;
-  return <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-    <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-neutral-900/90 p-6">
-      <div className="text-lg font-semibold">Quick 10‑second survey</div>
-      <p className="mt-1 text-sm text-white/70">Unlock 1 more free kit when you answer one question.</p>
-      <label className="mt-4 block text-sm text-white/80">How do you usually create listing copy?</label>
-      <select value={answer} onChange={(e)=>setAnswer(e.target.value)} className="mt-2 w-full rounded-2xl bg-neutral-950 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-cyan-400/60">
-        <option value="">Select an option</option>
-        <option>Write it myself</option>
-        <option>My team writes it</option>
-        <option>Freelancer / agency</option>
-        <option>Templates or previous listings</option>
-      </select>
-      <div className="mt-5 flex gap-3">
-        <button onClick={onClose} className="w-1/3 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 hover:bg-white/10">Cancel</button>
-        <button disabled={!answer} onClick={onSubmit} className={answer?'w-2/3 rounded-2xl px-4 py-2 font-semibold bg-white text-neutral-900 hover:opacity-90':'w-2/3 rounded-2xl px-4 py-2 font-semibold bg-white/20 text-white/60'}>Unlock 1 more free kit</button>
-      </div>
-    </div>
-  </div>;
-}
+// Modals are now imported from their own files.

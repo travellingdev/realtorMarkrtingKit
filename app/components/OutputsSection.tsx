@@ -52,7 +52,9 @@ function OutputCard({ title, icon: Icon, text, list, revealed, canCopy, onCopy, 
   );
 }
 
-export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAll, onRequestAuth, handleReveal, kitSample, isLoggedIn }:{
+import SkeletonLoader from './SkeletonLoader';
+
+export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAll, onRequestAuth, handleReveal, kitSample, isLoggedIn, kitStatus }:{
   outputs: null | { mlsDesc: string; igSlides: string[]; reelScript: string[]; emailSubject: string; emailBody: string };
   revealed: boolean;
   canCopyAll: boolean;
@@ -61,16 +63,24 @@ export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAl
   handleReveal: () => void;
   kitSample: boolean;
   isLoggedIn: boolean;
+  kitStatus: null | 'PROCESSING' | 'READY' | 'FAILED';
 }){
+  const isProcessing = kitStatus === 'PROCESSING';
+
   return (
     <section id="outputs" className="relative">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-20">
         <div className="flex items-end justify-between gap-4">
           <div>
             <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Your marketing kit</h2>
-            <p className="mt-2 text-white/70">MLS description, Instagram carousel, reel script, and email — generated from your details.</p>
+            <p className="mt-2 text-white/70">
+              {isProcessing
+                ? 'Generating your assets now...'
+                : 'MLS description, Instagram carousel, reel script, and email — generated from your details.'
+              }
+            </p>
           </div>
-          {!revealed && outputs ? (
+          {!revealed && outputs && !isProcessing ? (
             <button onClick={handleReveal} className="rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-2 text-sm font-semibold text-neutral-950 shadow hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed">
               {kitSample ? 'Reveal results' : isLoggedIn ? 'Reveal results' : 'Sign in to reveal'}
             </button>
@@ -78,42 +88,53 @@ export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAl
         </div>
 
         <div className="mt-6 grid md:grid-cols-2 gap-6">
-          <OutputCard
-            title="MLS Description"
-            icon={ClipboardList}
-            text={outputs?.mlsDesc}
-            revealed={revealed}
-            canCopy={kitSample ? isLoggedIn : revealed}
-            onCopy={() => outputs && navigator.clipboard.writeText(outputs.mlsDesc)}
-            onRequestAuth={onRequestAuth}
-          />
-          <OutputCard
-            title="Instagram Carousel (caption)"
-            icon={Instagram}
-            list={outputs?.igSlides}
-            revealed={revealed}
-            canCopy={kitSample ? isLoggedIn : revealed}
-            onCopy={() => outputs && navigator.clipboard.writeText(outputs.igSlides.join('\n'))}
-            onRequestAuth={onRequestAuth}
-          />
-          <OutputCard
-            title="30-Second Reel Script"
-            icon={PlayCircle}
-            list={outputs?.reelScript}
-            revealed={revealed}
-            canCopy={kitSample ? isLoggedIn : revealed}
-            onCopy={() => outputs && navigator.clipboard.writeText(outputs.reelScript.join('\n'))}
-            onRequestAuth={onRequestAuth}
-          />
-          <OutputCard
-            title="Open House Email"
-            icon={Mail}
-            text={outputs ? `Subject: ${outputs.emailSubject}\n\n${outputs.emailBody}` : undefined}
-            revealed={revealed}
-            canCopy={kitSample ? isLoggedIn : revealed}
-            onCopy={() => outputs && navigator.clipboard.writeText(`Subject: ${outputs.emailSubject}\n\n${outputs.emailBody}`)}
-            onRequestAuth={onRequestAuth}
-          />
+          {isProcessing ? (
+            <>
+              <SkeletonLoader />
+              <SkeletonLoader />
+              <SkeletonLoader />
+              <SkeletonLoader />
+            </>
+          ) : (
+            <>
+              <OutputCard
+                title="MLS Description"
+                icon={ClipboardList}
+                text={outputs?.mlsDesc}
+                revealed={revealed}
+                canCopy={kitSample ? isLoggedIn : revealed}
+                onCopy={() => outputs && navigator.clipboard.writeText(outputs.mlsDesc)}
+                onRequestAuth={onRequestAuth}
+              />
+              <OutputCard
+                title="Instagram Carousel (caption)"
+                icon={Instagram}
+                list={outputs?.igSlides}
+                revealed={revealed}
+                canCopy={kitSample ? isLoggedIn : revealed}
+                onCopy={() => outputs && navigator.clipboard.writeText(outputs.igSlides.join('\n'))}
+                onRequestAuth={onRequestAuth}
+              />
+              <OutputCard
+                title="30-Second Reel Script"
+                icon={PlayCircle}
+                list={outputs?.reelScript}
+                revealed={revealed}
+                canCopy={kitSample ? isLoggedIn : revealed}
+                onCopy={() => outputs && navigator.clipboard.writeText(outputs.reelScript.join('\n'))}
+                onRequestAuth={onRequestAuth}
+              />
+              <OutputCard
+                title="Open House Email"
+                icon={Mail}
+                text={outputs ? `Subject: ${outputs.emailSubject}\n\n${outputs.emailBody}` : undefined}
+                revealed={revealed}
+                canCopy={kitSample ? isLoggedIn : revealed}
+                onCopy={() => outputs && navigator.clipboard.writeText(`Subject: ${outputs.emailSubject}\n\n${outputs.emailBody}`)}
+                onRequestAuth={onRequestAuth}
+              />
+            </>
+          )}
         </div>
 
         <AnimatePresence>
