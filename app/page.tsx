@@ -621,6 +621,7 @@ export default function RealtorsAIMarketingKit() {
         handleReveal={handleReveal}
         kitSample={kitSample}
         isLoggedIn={isLoggedIn}
+        generated={generated}
       />
 
       {/* Paywall banner */}
