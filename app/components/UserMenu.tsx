@@ -31,8 +31,16 @@ export default function UserMenu() {
 
   return (
     <div className="relative">
-      <button ref={btnRef} onClick={() => setOpen((v) => !v)} className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-neutral-900 text-sm font-bold">
-        {(user.email || 'U').slice(0, 1).toUpperCase()}
+      <button
+        ref={btnRef}
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white text-neutral-900 text-sm font-bold"
+      >
+        {user.avatar_url ? (
+          <img src={user.avatar_url} alt="User avatar" className="h-full w-full object-cover" />
+        ) : (
+          (user.email || 'U').slice(0, 1).toUpperCase()
+        )}
       </button>
       {open && (
         <div ref={menuRef} role="menu" aria-label="User menu" onKeyDown={onKeyDown} tabIndex={-1} className="absolute right-0 mt-2 w-56 rounded-2xl border border-white/10 bg-neutral-900/90 p-2 shadow-xl">
