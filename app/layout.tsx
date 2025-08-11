@@ -1,4 +1,4 @@
-export const metadata = { title: "Realtor's AI Marketing Kit", description: 'AI marketing kit for real estate' };
+export const metadata = { title: 'Realtor Kit', description: 'AI marketing kit for real estate' };
 import './globals.css';
 import { UserProvider } from './providers/UserProvider';
 

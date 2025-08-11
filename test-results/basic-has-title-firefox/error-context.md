@@ -1,0 +1,158 @@
+# Page snapshot
+
+```yaml
+- banner:
+  - img
+  - text: Realtor's AI Marketing Kit
+  - navigation:
+    - link "How it works":
+      - /url: "#how"
+    - link "Outputs":
+      - /url: "#outputs"
+    - link "Pricing":
+      - /url: "#pricing"
+    - link "FAQ":
+      - /url: "#faq"
+  - button "Sign in":
+    - img
+    - text: Sign in
+  - button "Generate My First Kit →"
+- heading "Turn 2 hours of listing copy into 2 minutes." [level=1]
+- paragraph: Paste the basics; get MLS-safe descriptions, Instagram captions + 30-sec reel scripts, and open-house emails — consistent with your brand voice.
+- button "Generate My First Kit →"
+- button "Try a sample (no signup)"
+- img
+- text: MLS-safe phrasing
+- img
+- text: Realtor-tested outputs
+- img
+- text: "No credit card DESCRIPTION DRAFT #5"
+- list:
+  - listitem: light?? south?
+  - listitem: chef's kit?
+  - listitem: yard size?
+  - listitem: price TBD
+  - listitem: rewrite again
+- img
+- text: 12 photos
+- img
+- text: Listing Description Sun-filled 3BR near Brookfield… EV-ready garage; new roof (2023)
+- img
+- text: "Instagram Carousel Slide 1: Just Listed Slide 2: 3 Bed • 2 Bath • 1,850 sq ft"
+- img
+- text: "30-sec Reel Script Hook: If light matters… CTA: Comment 'TOUR'"
+- img
+- text: "Open House Email Subject: Open House Sat Reply to RSVP Illustrative UI – actual outputs below"
+- heading "Instant demo" [level=2]
+- paragraph: Drop a few details and generate real marketing assets in seconds.
+- text: Address (optional)
+- textbox "Address (optional)"
+- text: Neighborhood
+- textbox "Neighborhood"
+- text: Beds
+- spinbutton "Beds"
+- text: Baths
+- spinbutton "Baths"
+- text: Square Feet
+- spinbutton "Square Feet"
+- text: Key features (comma-separated)
+- textbox "Key features (comma-separated)"
+- img
+- text: "Photos (optional):"
+- button "Upload photos"
+- text: Property template
+- button "Luxury"
+- button "Starter Home"
+- button "Investor Flip"
+- button "Lakefront"
+- button "Downtown Condo"
+- button "New Construction"
+- button "Fixer-Upper"
+- text: Tone
+- button "Concise MLS"
+- button "Warm & Lifestyle"
+- button "Data-driven"
+- button "Hype for Social"
+- text: Brand voice (paste a past listing — optional)
+- textbox "E.g., 'Calm, confident tone. Short sentences. Avoid jargon.'"
+- button "Generate from these details"
+- button "Use a sample listing instead"
+- heading "Your marketing kit" [level=2]
+- paragraph: MLS description, Instagram carousel, reel script, and email — generated from your details.
+- img
+- heading "MLS Description" [level=3]
+- button "Sign in to Copy":
+  - img
+  - text: Sign in to Copy
+- text: Click “Reveal results” to view
+- list
+- img
+- heading "Instagram Carousel (caption)" [level=3]
+- button "Sign in to Copy":
+  - img
+  - text: Sign in to Copy
+- text: Click “Reveal results” to view
+- list
+- img
+- heading "30-Second Reel Script" [level=3]
+- button "Sign in to Copy":
+  - img
+  - text: Sign in to Copy
+- text: Click “Reveal results” to view
+- list
+- img
+- heading "Open House Email" [level=3]
+- button "Sign in to Copy":
+  - img
+  - text: Sign in to Copy
+- text: Click “Reveal results” to view
+- list
+- heading "Start free — 2 full kits on us" [level=2]
+- paragraph: Then pick a plan that fits your workflow.
+- text: Starter $0
+- paragraph: Try a complete kit. No card.
+- list:
+  - listitem:
+    - img
+    - text: 2 full kits
+  - listitem:
+    - img
+    - text: MLS + Social + Email
+  - listitem:
+    - img
+    - text: Copy anywhere
+- button "Get Started Free"
+- text: Most popular Pro $29/mo
+- paragraph: For active solo agents.
+- list:
+  - listitem:
+    - img
+    - text: Unlimited kits
+  - listitem:
+    - img
+    - text: Brand voice lock
+  - listitem:
+    - img
+    - text: Photo-aware captions
+  - listitem:
+    - img
+    - text: Priority support
+- button "Go Pro"
+- text: Team $99/mo
+- paragraph: For brokerages & teams.
+- list:
+  - listitem:
+    - img
+    - text: Seats & roles
+  - listitem:
+    - img
+    - text: Shared templates
+  - listitem:
+    - img
+    - text: Approvals
+  - listitem:
+    - img
+    - text: Analytics
+- button "Contact Sales"
+- alert
+```

@@ -11,7 +11,7 @@ test('get started link', async ({ page }) => {
   await page.goto('/');
 
   // Click the get started link.
-  await page.getByRole('button', { name: 'Generate My First Kit →' }).first().click();
+  await page.getByRole('button', { name: 'Generate My First Kit →' }).click();
 
   // Expects the URL to contain intro.
   await expect(page).toHaveURL(/#demo/);
