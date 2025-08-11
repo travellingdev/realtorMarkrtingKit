@@ -19,10 +19,37 @@ export default function UserMenu() {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open]);
 
+  useEffect(() => {
+    if (open) {
+      const first = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]');
+      first?.focus();
+    }
+  }, [open]);
+
   function onKeyDown(e: React.KeyboardEvent) {
     if (!open) return;
-    if (e.key === 'Escape') { setOpen(false); btnRef.current?.focus(); }
-    if (e.key === 'Tab') { e.preventDefault(); }
+    if (e.key === 'Escape') {
+      setOpen(false);
+      btnRef.current?.focus();
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const items = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]');
+      if (!items || items.length === 0) return;
+      const current = document.activeElement;
+      let index = Array.from(items).findIndex((item) => item === current);
+      if (index === -1) index = 0;
+      else if (e.key === 'ArrowDown') index = (index + 1) % items.length;
+      else index = (index - 1 + items.length) % items.length;
+      items[index].focus();
+    }
+    if (e.key === 'Tab') {
+      setOpen(false);
+      if (e.shiftKey) {
+        e.preventDefault();
+        btnRef.current?.focus();
+      }
+    }
   }
 
   if (!user) return null;
