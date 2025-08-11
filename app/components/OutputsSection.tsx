@@ -52,8 +52,24 @@ function OutputCard({ title, icon: Icon, text, list, revealed, canCopy, onCopy, 
   );
 }
 
-export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAll, onRequestAuth, handleReveal, kitSample, isLoggedIn }:{
-  outputs: null | { mlsDesc: string; igSlides: string[]; reelScript: string[]; emailSubject: string; emailBody: string };
+export default function OutputsSection({
+  outputs,
+  revealed,
+  canCopyAll,
+  onCopyAll,
+  onRequestAuth,
+  handleReveal,
+  kitSample,
+  isLoggedIn,
+  generated,
+}:{
+  outputs: null | {
+    mlsDesc: string;
+    igSlides: string[];
+    reelScript: string[];
+    emailSubject: string;
+    emailBody: string;
+  };
   revealed: boolean;
   canCopyAll: boolean;
   onCopyAll: () => void;
@@ -61,6 +77,7 @@ export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAl
   handleReveal: () => void;
   kitSample: boolean;
   isLoggedIn: boolean;
+  generated: boolean;
 }){
   return (
     <section id="outputs" className="relative">
@@ -70,9 +87,16 @@ export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAl
             <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Your marketing kit</h2>
             <p className="mt-2 text-white/70">MLS description, Instagram carousel, reel script, and email — generated from your details.</p>
           </div>
-          {!revealed && outputs ? (
-            <button onClick={handleReveal} className="rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-2 text-sm font-semibold text-neutral-950 shadow hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed">
-              {kitSample ? 'Reveal results' : isLoggedIn ? 'Reveal results' : 'Sign in to reveal'}
+          {!revealed && generated ? (
+            <button
+              onClick={handleReveal}
+              className="rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-2 text-sm font-semibold text-neutral-950 shadow hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {kitSample
+                ? 'Reveal results'
+                : isLoggedIn
+                ? 'Reveal results'
+                : 'Sign in to reveal'}
             </button>
           ) : null}
         </div>
