@@ -384,8 +384,16 @@ export default function RealtorsAIMarketingKit() {
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const scrollToDemo = () =>
-    document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" });
+  const scrollToDemo = () => {
+    const el = document.getElementById("demo");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" });
+      // Ensure URL reflects the section for tests and shareability
+      if (location.hash !== "#demo") {
+        history.replaceState(null, "", "#demo");
+      }
+    }
+  };
 
   const canCopyAll = () => {
     if (!outputs || !revealed) return false;
