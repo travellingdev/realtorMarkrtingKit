@@ -1,10 +1,9 @@
-import { redirect } from 'next/navigation';
 import { supabaseServer } from '@/lib/supabaseServer';
 
 export default async function BillingPage() {
   const sb = supabaseServer();
   const { data: { user } } = await sb.auth.getUser();
-  if (!user) redirect('/?returnTo=/billing');
+  if (!user) return null; // Auth enforced by layout
 
   const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
   const plan = profile?.plan || 'FREE';
