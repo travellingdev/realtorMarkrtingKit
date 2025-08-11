@@ -1,5 +1,5 @@
 'use client';
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
   Sparkles,
   LogIn,
@@ -14,7 +14,7 @@ import Pricing from "./components/Pricing";
 import AuthModal from "./components/AuthModal";
 import SurveyModal from "./components/SurveyModal";
 import { useRealtorKit } from "@/app/hooks/useRealtorKit";
-import { PROPERTY_TEMPLATES, TONES } from "@/lib/constants";
+import { PROPERTY_TEMPLATES, TONES, BASE_FREE_LIMIT } from "@/lib/constants";
 
 export default function RealtorsAIMarketingKit() {
   const {
@@ -52,8 +52,15 @@ export default function RealtorsAIMarketingKit() {
   const propertyTemplates = PROPERTY_TEMPLATES;
   const tones = TONES;
 
-  const scrollToDemo = () =>
-    document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" });
+  const scrollToDemo = () => {
+    const el = document.getElementById('demo');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+      if (location.hash !== '#demo') {
+        history.replaceState(null, '', '#demo');
+      }
+    }
+  };
 
   const canCopyAll = () => {
     if (!outputs || !revealed) return false;

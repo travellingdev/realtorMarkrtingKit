@@ -4,6 +4,7 @@ import { useUser } from '@/app/providers/UserProvider';
 import { buildPayloadFromForm } from '@/lib/payloadBuilder';
 import { saveIntent } from '@/lib/intent';
 import { BASE_FREE_LIMIT } from '@/lib/constants';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
 function computeFreeLimit(base: number, extraUnlocked: boolean) {
   return base + (extraUnlocked ? 1 : 0);
@@ -47,9 +48,41 @@ export function useRealtorKit() {
   const [kitStatus, setKitStatus] = useState<null | 'PROCESSING' | 'READY' | 'FAILED'>(null);
 
   // current kit metadata
-  const [kitId, setKitId] = useState(0);
+  const [kitId, setKitId] = useState<string | null>(null);
   const [kitSample, setKitSample] = useState(false);
   const [kitConsumed, setKitConsumed] = useState(false);
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!kitId || kitSample) return;
+
+    const sb = supabaseBrowser();
+    const channel = sb
+      .channel(`kit-${kitId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'kits',
+        filter: `id=eq.${kitId}`,
+      }, (payload) => {
+        const newKit = payload.new as { status: 'READY' | 'FAILED'; outputs: any };
+        if (newKit.status === 'READY' && newKit.outputs) {
+          setServerOutputs(newKit.outputs);
+          setKitStatus('READY');
+          channel.unsubscribe();
+        } else if (newKit.status === 'FAILED') {
+          setKitStatus('FAILED');
+          setCopyToast('Generation failed. Please try again.');
+          setTimeout(() => setCopyToast(''), 2000);
+          channel.unsubscribe();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [kitId, kitSample]);
 
   // Helpers
   const toFeatureList = useMemo(() => features.split(",").map((f) => f.trim()).filter(Boolean), [features]);
@@ -76,45 +109,16 @@ export function useRealtorKit() {
         return;
       }
       const data = await res.json().catch(() => null);
-      if (data?.kitId) setKitId(data.kitId);
+      if (data?.kitId) {
+        setKitId(data.kitId); // Start the subscription
+      }
       setKitSample(false);
       setKitConsumed(false);
       setGenerated(true);
       setRevealed(false);
       setServerOutputs(null);
       setKitStatus('PROCESSING');
-      if (data?.kitId) {
-        const start = Date.now();
-        const poll = async () => {
-          try {
-            const r = await fetch(`/api/kits/${data.kitId}`);
-            if (r.ok) {
-              const j = await r.json();
-              if (j?.status === 'READY' && j.outputs) {
-                setServerOutputs(j.outputs);
-                setKitStatus('READY');
-                return;
-              }
-              if (j?.status === 'FAILED') {
-                setKitStatus('FAILED');
-                setCopyToast('Generation failed. Please try again.');
-                setTimeout(() => setCopyToast(''), 2000);
-                return;
-              }
-            }
-          } catch (_) {
-            // ignore and keep polling
-          }
-          if (Date.now() - start < 30000) {
-            setTimeout(poll, 1000);
-          } else {
-            setKitStatus('FAILED');
-            setCopyToast('Generation timed out. Please try again.');
-            setTimeout(() => setCopyToast(''), 2000);
-          }
-        };
-        poll();
-      }
+
       const el = document.getElementById('outputs');
       el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } finally {
