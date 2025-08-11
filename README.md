@@ -23,6 +23,12 @@ npm run dev
 - `GET /api/me` — current user + quota
 - Razorpay (later): `/api/razorpay/checkout` and `/api/razorpay/webhook`
 
+## Env
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only)
+- `NEXT_PUBLIC_SUPPORT_EMAIL` (optional)
+
 ## Deploy
 - Push to Vercel, set env, deploy
 - Set Razorpay webhook to `/api/razorpay/webhook` when ready

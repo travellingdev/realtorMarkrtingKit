@@ -1,0 +1,1 @@
+'use server';import{ supabaseServer }from'./supabaseClients';export async function getUser(){const sb=supabaseServer();const{data:{user},error}=await sb.auth.getUser();if(error)return null;return user;}

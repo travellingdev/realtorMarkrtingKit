@@ -1,0 +1,1269 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Sparkles,
+  Wand2,
+  Copy,
+  Check,
+  Image as ImageIcon,
+  ChevronDown,
+  PlayCircle,
+  Mail,
+  Instagram,
+  ClipboardList,
+  ShieldCheck,
+  Rocket,
+  Star,
+  Users,
+  LogIn,
+  CreditCard,
+} from "lucide-react";
+
+// ======================================================
+// Realtor's AI Marketing Kit – Single-file React page
+// Mobile-first, TailwindCSS, subtle motion, accessible.
+// Elegant auth gating & free-tries logic (demo via localStorage)
+// ======================================================
+
+// ---- Small pure helpers so we can sanity-test logic ---- //
+export function computeFreeLimit(base, extraUnlocked) {
+  return base + (extraUnlocked ? 1 : 0);
+}
+
+// returns one of: 'ok', 'auth', 'paywall' (sample bypasses)
+export function revealDecision({ isLoggedIn, kitSample, freeKitsUsed, freeLimit }) {
+  if (kitSample) return "ok";
+  if (!isLoggedIn) return "auth";
+  if (freeKitsUsed >= freeLimit) return "paywall";
+  return "ok";
+}
+
+export default function RealtorsAIMarketingKit() {
+  // --- Auth & gating state ---
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+  const BASE_FREE_LIMIT = 2; // 2 custom kits free after login
+  const [extraUnlocked, setExtraUnlocked] = useState(false); // +1 via survey
+  const [freeKitsUsed, setFreeKitsUsed] = useState(0);
+
+  // Persist free kit state (demo/local)
+  useEffect(() => {
+    const u = Number(localStorage.getItem("freeKitsUsed") || 0);
+    const ex = localStorage.getItem("extraUnlocked") === "true";
+    const logged = localStorage.getItem("isLoggedIn") === "true";
+    setFreeKitsUsed(u);
+    setExtraUnlocked(ex);
+    setIsLoggedIn(logged);
+  }, []);
+  useEffect(() => {
+    localStorage.setItem("freeKitsUsed", String(freeKitsUsed));
+  }, [freeKitsUsed]);
+  useEffect(() => {
+    localStorage.setItem("extraUnlocked", String(extraUnlocked));
+  }, [extraUnlocked]);
+  useEffect(() => {
+    localStorage.setItem("isLoggedIn", String(isLoggedIn));
+  }, [isLoggedIn]);
+
+  const freeLimit = computeFreeLimit(BASE_FREE_LIMIT, extraUnlocked);
+
+  // --- Form state ---
+  const [address, setAddress] = useState("");
+  const [beds, setBeds] = useState("");
+  const [baths, setBaths] = useState("");
+  const [sqft, setSqft] = useState("");
+  const [neighborhood, setNeighborhood] = useState("");
+  const [features, setFeatures] = useState(""); // comma-separated
+  const [photos, setPhotos] = useState([]);
+  const [propertyType, setPropertyType] = useState("Starter Home");
+  const [tone, setTone] = useState("Warm & Lifestyle");
+  const [brandVoice, setBrandVoice] = useState("");
+
+  // --- Output state ---
+  const [generated, setGenerated] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [copyToast, setCopyToast] = useState("");
+
+  // current kit metadata
+  const [kitId, setKitId] = useState(0);
+  const [kitSample, setKitSample] = useState(false);
+  const [kitConsumed, setKitConsumed] = useState(false); // counts toward free kits used once revealed
+
+  const topRef = useRef(null);
+
+  const propertyTemplates = [
+    "Luxury",
+    "Starter Home",
+    "Investor Flip",
+    "Lakefront",
+    "Downtown Condo",
+    "New Construction",
+    "Fixer-Upper",
+  ];
+
+  const tones = [
+    "Concise MLS",
+    "Warm & Lifestyle",
+    "Data-driven",
+    "Hype for Social",
+  ];
+
+  // Helpers
+  const toFeatureList = useMemo(
+    () =>
+      features
+        .split(",")
+        .map((f) => f.trim())
+        .filter(Boolean),
+    [features]
+  );
+
+  const nearby = neighborhood ? `${neighborhood}` : "the area";
+
+  // Simple tone styles
+  const toneStyle = (text) => {
+    switch (tone) {
+      case "Concise MLS":
+        return (
+          text
+            .replaceAll(". ", "; ")
+            .replaceAll("..", ".")
+            .replace(/\s+/g, " ") + " (MLS-ready)"
+        );
+      case "Data-driven":
+        return (
+          text +
+          ` Key facts: ${beds || "—"} bd, ${baths || "—"} ba, ${sqft || "—"} sq ft. Energy notes: modern windows; estimated walk to amenities 5–10 min.`
+        );
+      case "Hype for Social":
+        return `🔥 ${text} Tap save + share with a friend who'd love this!`;
+      default: // Warm & Lifestyle
+        return text + " Imagine slow mornings, sun-lit rooms, and easy evenings.";
+    }
+  };
+
+  const propertyAngle = (base) => {
+    switch (propertyType) {
+      case "Luxury":
+        return `High-spec finishes, generous volume, and curated design moments throughout. ${base}`;
+      case "Investor Flip":
+        return `Clean numbers and compelling upside. ${base}`;
+      case "Lakefront":
+        return `Water views and breezy indoor–outdoor flow. ${base}`;
+      case "Downtown Condo":
+        return `Lock-and-leave living with elevator convenience. ${base}`;
+      case "New Construction":
+        return `Builder warranty, modern systems, and efficiency. ${base}`;
+      case "Fixer-Upper":
+        return `Bring vision—great bones, layout potential, and equity on day one. ${base}`;
+      default:
+        return base;
+    }
+  };
+
+  const photoHint = photos?.length
+    ? ` (${photos.length} photo${photos.length > 1 ? "s" : ""} noted in captions)`
+    : "";
+
+  // Core generator
+  const outputs = useMemo(() => {
+    if (!generated) return null;
+
+    const addr = address || "(address withheld)";
+    const featLine = toFeatureList.length
+      ? `Highlights: ${toFeatureList.slice(0, 6).join(" • ")}. `
+      : "";
+
+    const baseDesc = propertyAngle(
+      `Sun-filled ${beds || "?"}-bed, ${baths || "?"}-bath${sqft ? `, ${sqft} sq ft` : ""} near ${nearby}. ${featLine}` +
+        `Moments to parks, cafés, and daily conveniences in ${nearby}. Newer systems and easy parking.${photoHint}`
+    );
+
+    const styledDesc = toneStyle(
+      `${baseDesc} ${brandVoice ? `\n\nIn your voice: ${brandVoice}` : ""}`
+    );
+
+    const igSlides = [
+      `Just Listed${nearby ? ` in ${nearby}` : ""} 🏡`,
+      `${beds || "?"} Bed • ${baths || "?"} Bath${sqft ? ` • ${sqft} sq ft` : ""}`,
+      toFeatureList.length
+        ? `Why it's special: ${toFeatureList.slice(0, 3).join(", ")}`
+        : `Why it's special: light, flow, and location`,
+      `Open house: Sat 11–1 • ${addr}`,
+      `DM "TOUR" for details`,
+    ];
+
+    const reelScript = [
+      `Hook (0–3s): If natural light matters to you, watch this.`,
+      `Middle (4–20s): ${beds || "?"} bd/${baths || "?"} ba${sqft ? `, ${sqft} sq ft` : ""}; open kitchen; ${
+        toFeatureList[0] || "flex layout"
+      }; primary suite; easy yard.`,
+      `CTA (21–30s): Open house Sat 11–1 at ${addr}. Comment "TOUR" and I'll DM details.`,
+    ];
+
+    const emailSubject = `Open House ${nearby ? `• ${nearby} ` : ""}${beds || "?"}BR`;
+    const emailBody = `Hi there,\n\nWe're opening the doors at ${addr}. Quick look:\n\n• ${
+      beds || "?"
+    } bed / ${baths || "?"} bath${sqft ? ` • ${sqft} sq ft` : ""}\n• ${
+      toFeatureList.length
+        ? toFeatureList.slice(0, 4).join("\n• ")
+        : "Bright, functional, great location"
+    }\n• Near ${nearby} amenities\n\nOpen House: Sat 11–1\nReply to RSVP or request the full photo tour.\n\nBest,\nYour Realtor`;
+
+    return {
+      mlsDesc: styledDesc,
+      igSlides,
+      reelScript,
+      emailSubject,
+      emailBody,
+    };
+  }, [
+    generated,
+    address,
+    beds,
+    baths,
+    sqft,
+    neighborhood,
+    toFeatureList,
+    tone,
+    propertyType,
+    brandVoice,
+    photos,
+  ]);
+
+  // Copy helpers
+  const promptAuth = () => setShowAuth(true);
+  const copy = async (text, label = "Copied") => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyToast(label);
+      setTimeout(() => setCopyToast(""), 1600);
+    } catch (e) {
+      setCopyToast("Couldn't copy. Select manually.");
+      setTimeout(() => setCopyToast(""), 1600);
+    }
+  };
+
+  const copyAll = () => {
+    if (!outputs) return;
+    const bundle = [
+      "MLS Description:\n" + outputs.mlsDesc,
+      "\nInstagram Carousel:\n- " + outputs.igSlides.join("\n- "),
+      "\n30-sec Reel Script:\n- " + outputs.reelScript.join("\n- "),
+      "\nOpen House Email:\nSubject: " + outputs.emailSubject + "\n\n" + outputs.emailBody,
+    ].join("\n\n––––––––––––––––\n\n");
+    copy(bundle, "All assets copied");
+  };
+
+  const onGenerate = () => {
+    // new custom kit (may be behind reveal/login)
+    setKitId((k) => k + 1);
+    setKitSample(false);
+    setKitConsumed(false);
+    setGenerated(true);
+    setRevealed(false);
+    const el = document.getElementById("outputs");
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const useSample = () => {
+    setAddress("1420 Brookfield Ave");
+    setBeds("3");
+    setBaths("2");
+    setSqft("1850");
+    setNeighborhood("Brookfield");
+    setFeatures(
+      "Chef's kitchen, Wide-plank oak floors, EV-ready garage, South-facing light, Fenced yard, New roof 2023"
+    );
+    setPropertyType("Starter Home");
+    setTone("Warm & Lifestyle");
+    setBrandVoice("Friendly, confident, zero fluff. Short sentences.");
+
+    // sample kit: fully viewable, copy gated if not logged-in
+    setKitId((k) => k + 1);
+    setKitSample(true);
+    setKitConsumed(true); // does not reduce free tries
+    setGenerated(true);
+    setRevealed(true);
+
+    const el = document.getElementById("outputs");
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const scrollToDemo = () =>
+    document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" });
+
+  // Floating copy-all visibility
+  const canCopyAll = () => {
+    if (!outputs || !revealed) return false;
+    if (kitSample) return isLoggedIn; // sample requires login to copy
+    // custom kit: must be revealed; copy allowed even if at limit
+    return true;
+  };
+
+  // Reveal logic
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [showSurvey, setShowSurvey] = useState(false);
+
+  const handleReveal = () => {
+    const decision = revealDecision({
+      isLoggedIn,
+      kitSample,
+      freeKitsUsed,
+      freeLimit,
+    });
+
+    if (decision === "ok") {
+      if (!kitSample && !kitConsumed) {
+        setFreeKitsUsed((n) => n + 1);
+        setKitConsumed(true);
+      }
+      setRevealed(true);
+      return;
+    }
+    if (decision === "auth") {
+      setShowAuth(true);
+      return;
+    }
+    // paywall
+    setShowPaywall(true);
+  };
+
+  // Paywall + survey
+  const unlockOneMore = () => {
+    setShowPaywall(false);
+    setShowSurvey(true);
+  };
+
+  const onSurveySubmit = () => {
+    setExtraUnlocked(true);
+    setShowSurvey(false);
+    // try revealing again after unlock
+    handleReveal();
+  };
+
+  // Header avatar initial
+  const userInitial = "R";
+
+  return (
+    <div ref={topRef} className="min-h-screen bg-neutral-950 text-white">
+      <GradientDecoration />
+
+      {/* Header */}
+      <header className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-neutral-900/60 bg-neutral-900/80 border-b border-white/10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 shadow-lg shadow-cyan-500/20">
+              <Sparkles className="h-5 w-5" />
+            </span>
+            <div className="font-semibold tracking-tight">Realtor's AI Marketing Kit</div>
+          </div>
+          <nav className="hidden md:flex items-center gap-6 text-sm text-white/80">
+            <a href="#how" className="hover:text-white">
+              How it works
+            </a>
+            <a href="#outputs" className="hover:text-white">
+              Outputs
+            </a>
+            <a href="#pricing" className="hover:text-white">
+              Pricing
+            </a>
+            <a href="#faq" className="hover:text-white">
+              FAQ
+            </a>
+          </nav>
+          <div className="flex items-center gap-3">
+            {!isLoggedIn ? (
+              <button
+                onClick={() => setShowAuth(true)}
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
+              >
+                <LogIn className="h-4 w-4" /> Sign in
+              </button>
+            ) : (
+              <div className="inline-flex items-center gap-3">
+                <span className="text-xs text-white/70">
+                  Free kits used: {Math.min(freeKitsUsed, freeLimit)} / {freeLimit}
+                </span>
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-neutral-900 text-sm font-bold">
+                  {userInitial}
+                </span>
+              </div>
+            )}
+            <button
+              onClick={scrollToDemo}
+              className="rounded-2xl bg-white text-neutral-900 px-4 py-2 text-sm font-semibold hover:opacity-90 transition"
+            >
+              Generate My First Kit →
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero */}
+      <section className="relative">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 md:py-24 grid md:grid-cols-2 gap-10 items-center">
+          <div>
+            <motion.h1
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="text-4xl md:text-6xl font-semibold leading-tight tracking-tight"
+            >
+              Turn 2 hours of listing copy into 2 minutes.
+            </motion.h1>
+            <p className="mt-5 text-lg text-white/80 max-w-2xl">
+              Paste the basics; get <span className="font-semibold">MLS-safe</span> descriptions, Instagram captions + <span className="font-semibold">30-sec reel scripts</span>, and open-house emails — consistent with your brand voice.
+            </p>
+
+            <div className="mt-7 flex flex-wrap items-center gap-3">
+              <button
+                onClick={scrollToDemo}
+                className="rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-400 px-5 py-3 font-semibold text-neutral-950 shadow-lg shadow-cyan-500/30 hover:opacity-95"
+              >
+                Generate My First Kit →
+              </button>
+              <button
+                onClick={useSample}
+                className="text-white/80 hover:text-white underline underline-offset-4"
+              >
+                Try a sample (no signup)
+              </button>
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center gap-4 text-sm text-white/70">
+              <span className="inline-flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4" /> MLS-safe phrasing
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <Users className="h-4 w-4" /> Realtor-tested outputs
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <Star className="h-4 w-4" /> No credit card
+              </span>
+            </div>
+          </div>
+
+          {/* Split visual */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="relative"
+          >
+            <div className="relative rounded-3xl p-1 bg-gradient-to-br from-cyan-500/40 via-blue-500/30 to-fuchsia-500/30">
+              <div className="rounded-3xl bg-neutral-900 p-6">
+                <div className="grid grid-cols-5 gap-3">
+                  {/* Left: messy notes */}
+                  <div className="col-span-2 space-y-3">
+                    <FakeNote
+                      title="DESCRIPTION DRAFT #5"
+                      lines={[
+                        "light?? south?",
+                        "chef's kit?",
+                        "yard size?",
+                        "price TBD",
+                        "rewrite again",
+                      ]}
+                    />
+                    <FakePhotoStack />
+                  </div>
+                  {/* Right: tidy dashboard */}
+                  <div className="col-span-3 space-y-3">
+                    <FakeCard
+                      title="Listing Description"
+                      icon={ClipboardList}
+                      lines={[
+                        "Sun-filled 3BR near Brookfield…",
+                        "EV-ready garage; new roof (2023)",
+                      ]}
+                    />
+                    <FakeCard
+                      title="Instagram Carousel"
+                      icon={Instagram}
+                      lines={[
+                        "Slide 1: Just Listed",
+                        "Slide 2: 3 Bed • 2 Bath • 1,850 sq ft",
+                      ]}
+                    />
+                    <FakeCard
+                      title="30-sec Reel Script"
+                      icon={PlayCircle}
+                      lines={["Hook: If light matters…", "CTA: Comment 'TOUR'"]}
+                    />
+                    <FakeCard
+                      title="Open House Email"
+                      icon={Mail}
+                      lines={["Subject: Open House Sat", "Reply to RSVP"]}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/60">
+              Illustrative UI – actual outputs below
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Social proof */}
+      <section aria-label="social-proof" className="border-y border-white/10 bg-neutral-900/40">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 flex flex-wrap justify-center items-center gap-6 text-sm text-white/70">
+          <span className="inline-flex items-center gap-2">
+            <Users className="h-4 w-4" /> Trusted by 1,200+ agents
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <Rocket className="h-4 w-4" /> Avg. 8–12 hrs saved/month
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <Star className="h-4 w-4" /> 4.9/5 from beta users
+          </span>
+        </div>
+      </section>
+
+      {/* Instant Demo */}
+      <section id="demo" className="relative">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
+          <div className="grid lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2">
+              <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Instant demo</h2>
+              <p className="mt-2 text-white/70">
+                Drop a few details and generate real marketing assets in seconds.
+              </p>
+
+              <div className="mt-6 rounded-3xl border border-white/10 bg-neutral-900/60 p-5">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <LabeledInput
+                    label="Address (optional)"
+                    value={address}
+                    onChange={setAddress}
+                    placeholder="1420 Brookfield Ave"
+                  />
+                  <LabeledInput
+                    label="Neighborhood"
+                    value={neighborhood}
+                    onChange={setNeighborhood}
+                    placeholder="Brookfield"
+                  />
+
+                  <LabeledInput
+                    label="Beds"
+                    value={beds}
+                    onChange={setBeds}
+                    type="number"
+                    placeholder="3"
+                  />
+                  <LabeledInput
+                    label="Baths"
+                    value={baths}
+                    onChange={setBaths}
+                    type="number"
+                    placeholder="2"
+                  />
+
+                  <LabeledInput
+                    label="Square Feet"
+                    value={sqft}
+                    onChange={setSqft}
+                    type="number"
+                    placeholder="1850"
+                  />
+                  <LabeledInput
+                    label="Key features (comma-separated)"
+                    value={features}
+                    onChange={setFeatures}
+                    placeholder="Chef's kitchen, Wide-plank floors, EV garage"
+                  />
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <label className="inline-flex items-center gap-2 text-sm text-white/80">
+                    <ImageIcon className="h-4 w-4" /> Photos (optional):
+                    <input
+                      aria-label="Upload photos"
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={(e) => setPhotos(Array.from(e.target.files || []))}
+                      className="block text-xs file:mr-3 file:rounded-xl file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-neutral-900 hover:file:opacity-90"
+                    />
+                  </label>
+                  {photos?.length ? (
+                    <span className="text-xs text-white/60">{photos.length} selected</span>
+                  ) : null}
+                </div>
+
+                {/* Templates & Tones */}
+                <div className="mt-6 grid md:grid-cols-2 gap-6">
+                  <ChipGroup
+                    label="Property template"
+                    options={propertyTemplates}
+                    value={propertyType}
+                    onChange={setPropertyType}
+                  />
+                  <ChipGroup
+                    label="Tone"
+                    options={tones}
+                    value={tone}
+                    onChange={setTone}
+                  />
+                </div>
+
+                {/* Brand Voice */}
+                <div className="mt-6">
+                  <label className="text-sm text-white/80">
+                    Brand voice (paste a past listing — optional)
+                  </label>
+                  <textarea
+                    value={brandVoice}
+                    onChange={(e) => setBrandVoice(e.target.value)}
+                    rows={3}
+                    placeholder="E.g., 'Calm, confident tone. Short sentences. Avoid jargon.'"
+                    className="mt-2 w-full rounded-2xl bg-neutral-950 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-cyan-400/60"
+                  />
+                </div>
+
+                <div className="mt-6 flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={onGenerate}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-white text-neutral-900 px-5 py-3 font-semibold hover:opacity-90"
+                  >
+                    <Wand2 className="h-4 w-4" /> Generate from these details
+                  </button>
+                  <button
+                    onClick={useSample}
+                    className="text-white/80 hover:text-white underline underline-offset-4"
+                  >
+                    Use a sample listing instead
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* How it works */}
+            <div id="how" className="lg:col-span-1">
+              <div className="rounded-3xl border border-white/10 bg-neutral-900/60 p-5">
+                <h3 className="text-xl font-semibold">How it works</h3>
+                <ol className="mt-4 space-y-4 text-white/80">
+                  <li className="flex gap-3">
+                    <span className="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white text-neutral-900 text-sm font-bold">
+                      1
+                    </span>
+                    <span>
+                      Paste basics or upload photos. We pick up features automatically.
+                    </span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white text-neutral-900 text-sm font-bold">
+                      2
+                    </span>
+                    <span>Choose tone & channels (MLS, Instagram, Reel script, Email).</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white text-neutral-900 text-sm font-bold">
+                      3
+                    </span>
+                    <span>Copy, post, or download your kit in one click.</span>
+                  </li>
+                </ol>
+
+                <div className="mt-6 grid grid-cols-3 gap-3 text-xs text-white/70">
+                  <Tag>MLS-safe</Tag>
+                  <Tag>Brand voice</Tag>
+                  <Tag>Photo-aware</Tag>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Outputs Gallery */}
+      <section id="outputs" className="relative">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-20">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Your marketing kit</h2>
+              <p className="mt-2 text-white/70">
+                MLS description, Instagram carousel, reel script, and email — generated from your details.
+              </p>
+            </div>
+            {!revealed && generated ? (
+              <button
+                onClick={handleReveal}
+                className="rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-2 text-sm font-semibold text-neutral-950 shadow hover:opacity-95"
+              >
+                {kitSample ? "Reveal results" : isLoggedIn ? "Reveal results" : "Sign in to reveal"}
+              </button>
+            ) : null}
+          </div>
+
+          {/* Paywall banner when out of credits and trying to reveal */}
+          <AnimatePresence>
+            {showPaywall && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                className="mt-4 rounded-3xl border border-cyan-400/40 bg-cyan-400/10 p-5"
+              >
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <div className="text-lg font-semibold">You've used your free kits</div>
+                    <p className="text-white/70 text-sm mt-1">
+                      Upgrade for unlimited kits, brand lock, and saved templates.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {!extraUnlocked && (
+                      <button
+                        onClick={unlockOneMore}
+                        className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
+                      >
+                        Get 1 more free kit (10s survey)
+                      </button>
+                    )}
+                    <a
+                      href="#pricing"
+                      className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 hover:opacity-90"
+                    >
+                      <CreditCard className="h-4 w-4" /> See plans
+                    </a>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="mt-6 grid md:grid-cols-2 gap-6">
+            <OutputCard
+              title="MLS Description"
+              icon={ClipboardList}
+              text={outputs?.mlsDesc}
+              revealed={revealed}
+              canCopy={kitSample ? isLoggedIn : revealed}
+              onCopy={() => outputs && copy(outputs.mlsDesc, "MLS copied")}
+              onRequestAuth={promptAuth}
+            />
+            <OutputCard
+              title="Instagram Carousel (caption)"
+              icon={Instagram}
+              list={outputs?.igSlides}
+              revealed={revealed}
+              canCopy={kitSample ? isLoggedIn : revealed}
+              onCopy={() => outputs && copy(outputs.igSlides.join("\n"), "IG caption copied")}
+              onRequestAuth={promptAuth}
+            />
+            <OutputCard
+              title="30-Second Reel Script"
+              icon={PlayCircle}
+              list={outputs?.reelScript}
+              revealed={revealed}
+              canCopy={kitSample ? isLoggedIn : revealed}
+              onCopy={() => outputs && copy(outputs.reelScript.join("\n"), "Reel script copied")}
+              onRequestAuth={promptAuth}
+            />
+            <OutputCard
+              title="Open House Email"
+              icon={Mail}
+              text={outputs ? `Subject: ${outputs.emailSubject}\n\n${outputs.emailBody}` : undefined}
+              revealed={revealed}
+              canCopy={kitSample ? isLoggedIn : revealed}
+              onCopy={() =>
+                outputs &&
+                copy(`Subject: ${outputs.emailSubject}\n\n${outputs.emailBody}`, "Email copied")
+              }
+              onRequestAuth={promptAuth}
+            />
+          </div>
+        </div>
+
+        {/* Floating Copy All */}
+        <AnimatePresence>
+          {canCopyAll() && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40"
+            >
+              <button
+                onClick={isLoggedIn ? copyAll : promptAuth}
+                className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 font-semibold text-neutral-900 shadow-lg hover:opacity-90"
+              >
+                <Copy className="h-4 w-4" /> {isLoggedIn ? "Copy All Assets" : "Sign in to Copy"}
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </section>
+
+      {/* Personalization */}
+      <section className="border-y border-white/10 bg-neutral-900/40">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 grid md:grid-cols-3 gap-8">
+          <Perk
+            icon={ShieldCheck}
+            title="Brand Voice"
+            desc="Train once on your past listing to keep your style consistent across MLS and social."
+          />
+          <Perk
+            icon={Sparkles}
+            title="Local Flavor"
+            desc="We emphasize neighborhood highlights and commute conveniences automatically."
+          />
+          <Perk
+            icon={ImageIcon}
+            title="Photo-aware"
+            desc="We reference visible features from your photos for captions and hooks."
+          />
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section id="pricing">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center">
+            <h2 className="text-3xl font-semibold tracking-tight">Start free — 1 full kit on us</h2>
+            <p className="mt-2 text-white/70">Then pick a plan that fits your workflow.</p>
+          </div>
+
+          <div className="mt-10 grid md:grid-cols-3 gap-6">
+            <PriceCard
+              name="Starter"
+              price="$0"
+              blurb="Try a complete kit. No card."
+              features={["1 full kit", "MLS + Social + Email", "Copy anywhere"]}
+              cta="Get Started Free"
+            />
+            <PriceCard
+              name="Pro"
+              price="$29/mo"
+              highlight
+              blurb="For active solo agents."
+              features={[
+                "Unlimited kits",
+                "Brand voice lock",
+                "Photo-aware captions",
+                "Priority support",
+              ]}
+              cta="Go Pro"
+            />
+            <PriceCard
+              name="Team"
+              price="$99/mo"
+              blurb="For brokerages & teams."
+              features={["Seats & roles", "Shared templates", "Approvals", "Analytics"]}
+              cta="Contact Sales"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" className="border-t border-white/10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
+          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">FAQ</h2>
+          <div className="mt-6 divide-y divide-white/10 rounded-3xl border border-white/10 bg-neutral-900/60">
+            <FAQItem
+              q="Will it sound generic?"
+              a="No. Choose tone and (optionally) paste a past listing. We keep your voice consistent."
+            />
+            <FAQItem
+              q="MLS-safe?"
+              a="We avoid fair-housing red flags and stick to compliant phrasing by default."
+            />
+            <FAQItem q="Do I need photos?" a="No. Text-only works. Photos simply make captions and hooks smarter." />
+            <FAQItem
+              q="Team features?"
+              a="Yes—shared templates, approvals, and role-based access on the Team plan."
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-white/10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 text-sm text-white/60 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div>© {new Date().getFullYear()} Realtor's AI Marketing Kit</div>
+          <div className="flex items-center gap-6">
+            <a href="#" className="hover:text-white">
+              Contact
+            </a>
+            <a href="#" className="hover:text-white">
+              Privacy
+            </a>
+            <a href="#" className="hover:text-white">
+              Terms
+            </a>
+          </div>
+        </div>
+      </footer>
+
+      {/* Auth modal */}
+      <AuthModal
+        open={showAuth}
+        onClose={() => setShowAuth(false)}
+        onSuccess={() => {
+          setIsLoggedIn(true);
+          setShowAuth(false);
+        }}
+      />
+
+      {/* Survey modal for +1 free kit */}
+      <SurveyModal
+        open={showSurvey}
+        onClose={() => setShowSurvey(false)}
+        onSubmit={onSurveySubmit}
+      />
+
+      {/* Toast */}
+      <AnimatePresence>
+        {copyToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="fixed bottom-5 right-5 z-50 rounded-xl bg-white px-4 py-2 text-sm font-medium text-neutral-900 shadow-lg"
+          >
+            {copyToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ===================== UI Building Blocks ===================== //
+
+function GradientDecoration() {
+  return (
+    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+      <div className="absolute -top-1/3 left-1/2 h-[60rem] w-[60rem] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.15),transparent_60%)]" />
+      <div className="absolute bottom-[-20%] left-1/4 h-[40rem] w-[40rem] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(147,51,234,0.15),transparent_60%)]" />
+    </div>
+  );
+}
+
+function LabeledInput({ label, value, onChange, type = "text", placeholder }) {
+  return (
+    <label className="block">
+      <div className="text-sm text-white/80">{label}</div>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        type={type}
+        placeholder={placeholder}
+        className="mt-2 w-full rounded-2xl bg-neutral-950 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-cyan-400/60"
+      />
+    </label>
+  );
+}
+
+function Tag({ children }) {
+  return (
+    <span className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 py-1">
+      {children}
+    </span>
+  );
+}
+
+function ChipGroup({ label, options, value, onChange }) {
+  return (
+    <div>
+      <div className="text-sm text-white/80">{label}</div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {options.map((opt) => (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => onChange(opt)}
+            className={
+              "rounded-2xl border px-3 py-1.5 text-sm transition " +
+              (value === opt
+                ? "border-cyan-400 bg-cyan-400/10 text-cyan-300"
+                : "border-white/10 bg-white/5 text-white/80 hover:text-white")
+            }
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OutputCard({ title, icon: Icon, text, list, revealed, canCopy, onCopy, onRequestAuth }) {
+  const body = text ? (
+    <pre className="whitespace-pre-wrap text-sm leading-relaxed text-white/90">{text}</pre>
+  ) : (
+    <ul className="list-disc pl-5 space-y-2 text-sm text-white/90">
+      {list?.map((line, i) => (
+        <li key={i}>{line}</li>
+      ))}
+    </ul>
+  );
+
+  const copyButton = (
+    <button
+      onClick={canCopy ? onCopy : onRequestAuth}
+      className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm transition ${
+        canCopy
+          ? "border-white/10 bg-white text-neutral-900 hover:opacity-90"
+          : "border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
+      }`}
+    >
+      <Copy className="h-4 w-4" /> {canCopy ? "Copy" : "Sign in to Copy"}
+    </button>
+  );
+
+  return (
+    <div className="relative rounded-3xl border border-white/10 bg-neutral-900/60 p-5">
+      <div className="flex items-center justify-between">
+        <div className="inline-flex items-center gap-2">
+          <Icon className="h-5 w-5 text-white/80" />
+          <h3 className="font-semibold">{title}</h3>
+        </div>
+        {copyButton}
+      </div>
+
+      <div className="mt-4 relative">
+        {!revealed && (
+          <div className="absolute inset-0 z-10 rounded-2xl backdrop-blur-[2px] bg-neutral-950/40 flex items-center justify-center">
+            <span className="text-white/70 text-sm">{`Click “${
+              canCopy ? "Reveal results" : "Sign in to reveal"
+            }” to view`}</span>
+          </div>
+        )}
+        {body}
+      </div>
+    </div>
+  );
+}
+
+function Perk({ icon: Icon, title, desc }) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-neutral-900/60 p-6">
+      <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400/30 to-blue-500/30">
+        <Icon className="h-6 w-6" />
+      </div>
+      <h3 className="mt-4 text-xl font-semibold">{title}</h3>
+      <p className="mt-2 text-white/70">{desc}</p>
+    </div>
+  );
+}
+
+function PriceCard({ name, price, blurb, features, cta, highlight }) {
+  return (
+    <div
+      className={
+        "relative rounded-3xl border p-6 bg-neutral-900/60 " +
+        (highlight
+          ? "border-cyan-400/60 shadow-[0_0_40px_rgba(34,211,238,0.15)]"
+          : "border-white/10")
+      }
+    >
+      {highlight && (
+        <span className="absolute -top-3 left-6 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-3 py-1 text-xs font-semibold text-neutral-950">
+          Most popular
+        </span>
+      )}
+      <div className="text-sm text-white/70">{name}</div>
+      <div className="mt-1 text-3xl font-semibold">{price}</div>
+      <p className="mt-2 text-white/70">{blurb}</p>
+      <ul className="mt-4 space-y-2 text-sm text-white/80">
+        {features.map((f) => (
+          <li key={f} className="flex gap-2">
+            <Check className="h-4 w-4 text-cyan-300" />
+            {f}
+          </li>
+        ))}
+      </ul>
+      <button className="mt-6 w-full rounded-2xl bg-white px-4 py-2 font-semibold text-neutral-900 hover:opacity-90">
+        {cta}
+      </button>
+    </div>
+  );
+}
+
+function FAQItem({ q, a }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="px-6 py-4">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between text-left"
+      >
+        <span className="text-white/90 font-medium">{q}</span>
+        <ChevronDown className={`h-5 w-5 transition ${open ? "rotate-180" : ""}`} />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.p
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden text-white/70 text-sm leading-6 pt-3"
+          >
+            {a}
+          </motion.p>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// Faux UI pieces used in hero illustration
+function FakeCard({ title, icon: Icon, lines = [] }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-neutral-950 p-4">
+      <div className="flex items-center gap-2 text-sm text-white/80">
+        <Icon className="h-4 w-4" />
+        <span>{title}</span>
+      </div>
+      <div className="mt-3 space-y-2 text-xs text-white/70">
+        {lines.map((l, i) => (
+          <div key={i} className="rounded-lg bg-white/5 px-3 py-2">
+            {l}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FakeNote({ title, lines = [] }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <div className="text-xs font-semibold text-white/80">{title}</div>
+      <ul className="mt-2 space-y-1 text-xs text-white/70 list-disc pl-4">
+        {lines.map((l, i) => (
+          <li key={i}>{l}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function FakePhotoStack() {
+  return (
+    <div className="relative h-28">
+      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20" />
+      <div className="absolute inset-2 rounded-lg border border-white/10 bg-neutral-950" />
+      <div className="absolute right-2 bottom-2 text-[10px] text-white/70 inline-flex items-center gap-1">
+        <ImageIcon className="h-3 w-3" /> 12 photos
+      </div>
+    </div>
+  );
+}
+
+// ======= Auth & Survey Modals ======= //
+function AuthModal({ open, onClose, onSuccess }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-neutral-900/90 p-6">
+        <div className="text-lg font-semibold">Sign in to continue</div>
+        <p className="mt-1 text-sm text-white/70">
+          Copy & download are unlocked after a quick sign-in.
+        </p>
+        <div className="mt-5 space-y-3">
+          <button
+            onClick={onSuccess}
+            className="w-full rounded-2xl bg-white text-neutral-900 px-4 py-2 font-semibold hover:opacity-90"
+          >
+            Continue with Google
+          </button>
+          <button
+            onClick={onSuccess}
+            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2 hover:bg-white/10"
+          >
+            Continue with Apple
+          </button>
+          <button
+            onClick={onSuccess}
+            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2 hover:bg-white/10"
+          >
+            Email magic link
+          </button>
+        </div>
+        <button
+          onClick={onClose}
+          className="mt-4 w-full text-center text-sm text-white/60 hover:text-white"
+        >
+          Maybe later
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SurveyModal({ open, onClose, onSubmit }) {
+  const [answer, setAnswer] = useState("");
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-neutral-900/90 p-6">
+        <div className="text-lg font-semibold">Quick 10‑second survey</div>
+        <p className="mt-1 text-sm text-white/70">
+          Unlock 1 more free kit when you answer one question.
+        </p>
+        <label className="mt-4 block text-sm text-white/80">
+          How do you usually create listing copy?
+        </label>
+        <select
+          value={answer}
+          onChange={(e) => setAnswer(e.target.value)}
+          className="mt-2 w-full rounded-2xl bg-neutral-950 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-cyan-400/60"
+        >
+          <option value="">Select an option</option>
+          <option>Write it myself</option>
+          <option>My team writes it</option>
+          <option>Freelancer / agency</option>
+          <option>Templates or previous listings</option>
+        </select>
+        <div className="mt-5 flex gap-3">
+          <button
+            onClick={onClose}
+            className="w-1/3 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 hover:bg-white/10"
+          >
+            Cancel
+          </button>
+          <button
+            disabled={!answer}
+            onClick={onSubmit}
+            className={
+              answer
+                ? "w-2/3 rounded-2xl px-4 py-2 font-semibold bg-white text-neutral-900 hover:opacity-90"
+                : "w-2/3 rounded-2xl px-4 py-2 font-semibold bg-white/20 text-white/60"
+            }
+          >
+            Unlock 1 more free kit
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------- Tiny runtime tests (dev) ---------------- //
+try {
+  console.assert(computeFreeLimit(2, false) === 2, "freeLimit: base only");
+  console.assert(computeFreeLimit(2, true) === 3, "+1 survey unlock");
+  console.assert(
+    revealDecision({ isLoggedIn: false, kitSample: false, freeKitsUsed: 0, freeLimit: 2 }) === "auth",
+    "reveal requires auth when logged out"
+  );
+  console.assert(
+    revealDecision({ isLoggedIn: true, kitSample: false, freeKitsUsed: 2, freeLimit: 2 }) === "paywall",
+    "paywall when limit reached"
+  );
+  console.assert(
+    revealDecision({ isLoggedIn: true, kitSample: true, freeKitsUsed: 100, freeLimit: 0 }) === "ok",
+    "sample always ok"
+  );
+} catch (e) {
+  // Non-fatal in production render
+}
