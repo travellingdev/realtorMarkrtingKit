@@ -10,6 +10,22 @@ export function buildPayloadFromForm({
   propertyType,
   tone,
   brandVoice,
+  channels,
+  openHouseDate,
+  openHouseTime,
+  openHouseLink,
+  ctaType,
+  ctaPhone,
+  ctaLink,
+  ctaCustom,
+  socialHandle,
+  hashtagStrategy,
+  extraHashtags,
+  readingLevel,
+  useEmojis,
+  mlsFormat,
+  mustInclude,
+  avoidWords,
 }: {
   address: string;
   beds: string;
@@ -20,7 +36,23 @@ export function buildPayloadFromForm({
   propertyType: string;
   tone: string;
   brandVoice: string;
-}): Payload {
+  channels: string[];
+  openHouseDate: string;
+  openHouseTime: string;
+  openHouseLink: string;
+  ctaType: string;
+  ctaPhone: string;
+  ctaLink: string;
+  ctaCustom: string;
+  socialHandle: string;
+  hashtagStrategy: string;
+  extraHashtags: string;
+  readingLevel: string;
+  useEmojis: boolean;
+  mlsFormat: string;
+  mustInclude: string;
+  avoidWords: string;
+}): { payload: Payload; controls: any } {
   const toStr = (v: string) => (v?.trim() ? v.trim() : undefined);
   const featureList = features
     .split(',')
@@ -38,7 +70,25 @@ export function buildPayloadFromForm({
     propertyType: toStr(propertyType),
     brandVoice: toStr(brandVoice),
   };
-  return payload;
+  const controls = {
+    channels: channels && channels.length ? channels : undefined,
+    openHouseDate: toStr(openHouseDate),
+    openHouseTime: toStr(openHouseTime),
+    openHouseLink: toStr(openHouseLink),
+    ctaType: toStr(ctaType),
+    ctaPhone: toStr(ctaPhone),
+    ctaLink: toStr(ctaLink),
+    ctaCustom: toStr(ctaCustom),
+    socialHandle: toStr(socialHandle),
+    hashtagStrategy: toStr(hashtagStrategy),
+    extraHashtags: toStr(extraHashtags),
+    readingLevel: toStr(readingLevel),
+    useEmojis: useEmojis ? true : undefined,
+    mlsFormat: toStr(mlsFormat),
+    mustInclude: toStr(mustInclude),
+    avoidWords: toStr(avoidWords),
+  };
+  return { payload, controls };
 }
 
 

@@ -37,6 +37,22 @@ export function useRealtorKit() {
   const [propertyType, setPropertyType] = useState("Starter Home");
   const [tone, setTone] = useState("Warm & Lifestyle");
   const [brandVoice, setBrandVoice] = useState("");
+  const [channels, setChannels] = useState<string[]>(['mls', 'instagram', 'reel', 'email']);
+  const [openHouseDate, setOpenHouseDate] = useState("");
+  const [openHouseTime, setOpenHouseTime] = useState("");
+  const [openHouseLink, setOpenHouseLink] = useState("");
+  const [ctaType, setCtaType] = useState("");
+  const [ctaPhone, setCtaPhone] = useState("");
+  const [ctaLink, setCtaLink] = useState("");
+  const [ctaCustom, setCtaCustom] = useState("");
+  const [socialHandle, setSocialHandle] = useState("");
+  const [hashtagStrategy, setHashtagStrategy] = useState("");
+  const [extraHashtags, setExtraHashtags] = useState("");
+  const [readingLevel, setReadingLevel] = useState("");
+  const [useEmojis, setUseEmojis] = useState(false);
+  const [mlsFormat, setMlsFormat] = useState("paragraph");
+  const [mustInclude, setMustInclude] = useState("");
+  const [avoidWords, setAvoidWords] = useState("");
 
   // --- Output state ---
   const [generated, setGenerated] = useState(false);
@@ -65,7 +81,33 @@ export function useRealtorKit() {
     setIsGenerating(true);
     try {
       console.log('[useRealtorKit] onGenerate begin');
-      const payload = buildPayloadFromForm({ address, beds, baths, sqft, neighborhood, features, propertyType, tone, brandVoice });
+      const { payload, controls } = buildPayloadFromForm({
+        address,
+        beds,
+        baths,
+        sqft,
+        neighborhood,
+        features,
+        propertyType,
+        tone,
+        brandVoice,
+        channels,
+        openHouseDate,
+        openHouseTime,
+        openHouseLink,
+        ctaType,
+        ctaPhone,
+        ctaLink,
+        ctaCustom,
+        socialHandle,
+        hashtagStrategy,
+        extraHashtags,
+        readingLevel,
+        useEmojis,
+        mlsFormat,
+        mustInclude,
+        avoidWords,
+      });
       console.log('[useRealtorKit] payload', {
         hasAddress: Boolean(address), hasBeds: Boolean(beds), hasBaths: Boolean(baths), hasSqft: Boolean(sqft), hasNeighborhood: Boolean(neighborhood),
         featuresCount: features.split(',').filter(Boolean).length,
@@ -74,7 +116,7 @@ export function useRealtorKit() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ payload, controls }),
       });
       if (!res.ok) {
         console.warn('[useRealtorKit] /api/generate failed', { status: res.status });
@@ -234,6 +276,22 @@ export function useRealtorKit() {
     propertyType, setPropertyType,
     tone, setTone,
     brandVoice, setBrandVoice,
+    channels, setChannels,
+    openHouseDate, setOpenHouseDate,
+    openHouseTime, setOpenHouseTime,
+    openHouseLink, setOpenHouseLink,
+    ctaType, setCtaType,
+    ctaPhone, setCtaPhone,
+    ctaLink, setCtaLink,
+    ctaCustom, setCtaCustom,
+    socialHandle, setSocialHandle,
+    hashtagStrategy, setHashtagStrategy,
+    extraHashtags, setExtraHashtags,
+    readingLevel, setReadingLevel,
+    useEmojis, setUseEmojis,
+    mlsFormat, setMlsFormat,
+    mustInclude, setMustInclude,
+    avoidWords, setAvoidWords,
     generated,
     revealed,
     copyToast, setCopyToast,
