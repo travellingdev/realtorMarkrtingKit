@@ -122,6 +122,7 @@ export function useRealtorKit() {
         console.warn('[useRealtorKit] /api/generate failed', { status: res.status });
         setCopyToast('Failed to generate. Please try again.');
         setTimeout(() => setCopyToast(''), 1600);
+        setKitStatus('FAILED');
         return;
       }
       const data = await res.json().catch(() => null);
@@ -170,6 +171,11 @@ export function useRealtorKit() {
       }
       const el = document.getElementById('outputs');
       el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (err) {
+      console.warn('[useRealtorKit] onGenerate error', err);
+      setCopyToast('Unexpected error. Please try again.');
+      setTimeout(() => setCopyToast(''), 1600);
+      setKitStatus('FAILED');
     } finally {
       setIsGenerating(false);
     }
@@ -215,16 +221,22 @@ export function useRealtorKit() {
       if (res.status === 401) {
         console.warn('[useRealtorKit] reveal unauthorized');
         setShowAuth(true);
+        setCopyToast('Please sign in to reveal results.');
+        setTimeout(() => setCopyToast(''), 2000);
         return;
       }
       if (res.status === 402) {
         const data = await res.json().catch(() => null);
         console.warn('[useRealtorKit] reveal paywall', { used: data?.used, limit: data?.limit });
+        setCopyToast('Free quota reached. Upgrade to reveal more.');
+        setTimeout(() => setCopyToast(''), 2000);
         // setShowPaywall(true); // This state is not in the hook
         return;
       }
       if (!res.ok) {
         console.warn('[useRealtorKit] reveal failed', { status: res.status });
+        setCopyToast('Failed to reveal results. Please try again.');
+        setTimeout(() => setCopyToast(''), 2000);
         // setShowPaywall(true);
         return;
       }
@@ -233,8 +245,10 @@ export function useRealtorKit() {
       if (data && typeof data.used === 'number') setFreeKitsUsed(data.used);
       setKitConsumed(true);
       setRevealed(true);
-    } catch (_) {
-      console.warn('[useRealtorKit] reveal error');
+    } catch (err) {
+      console.warn('[useRealtorKit] reveal error', err);
+      setCopyToast('Unexpected error revealing results.');
+      setTimeout(() => setCopyToast(''), 2000);
       // setShowPaywall(true);
     }
   };
