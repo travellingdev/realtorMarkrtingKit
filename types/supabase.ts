@@ -44,6 +44,12 @@ export type Database = {
           payload: Json
           status: Database["public"]["Enums"]["kit_status"]
           user_id: string | null
+          facts_hash: string | null
+          latency_ms: number | null
+          token_counts: Json | null
+          flags: string[] | null
+          quality_score: number | null
+          prompt_version: string | null
         }
         Insert: {
           created_at?: string | null
@@ -52,6 +58,12 @@ export type Database = {
           payload: Json
           status?: Database["public"]["Enums"]["kit_status"]
           user_id?: string | null
+          facts_hash?: string | null
+          latency_ms?: number | null
+          token_counts?: Json | null
+          flags?: string[] | null
+          quality_score?: number | null
+          prompt_version?: string | null
         }
         Update: {
           created_at?: string | null
@@ -60,6 +72,12 @@ export type Database = {
           payload?: Json
           status?: Database["public"]["Enums"]["kit_status"]
           user_id?: string | null
+          facts_hash?: string | null
+          latency_ms?: number | null
+          token_counts?: Json | null
+          flags?: string[] | null
+          quality_score?: number | null
+          prompt_version?: string | null
         }
         Relationships: []
       }

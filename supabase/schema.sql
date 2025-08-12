@@ -16,6 +16,12 @@ create table if not exists public.kits (
   status kit_status not null default 'PROCESSING',
   payload jsonb not null,
   outputs jsonb,
+  facts_hash text,
+  latency_ms int,
+  token_counts jsonb,
+  flags text[],
+  quality_score int,
+  prompt_version text,
   created_at timestamp with time zone default now()
 );
 alter table public.kits enable row level security;

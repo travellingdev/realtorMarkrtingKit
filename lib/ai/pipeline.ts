@@ -1,7 +1,7 @@
 import type { Payload } from '@/lib/generator';
 import type { Output, Facts, Controls } from './schemas';
 import { FactsSchema, OutputSchema } from './schemas';
-import { callProvider, ChatMessage } from './provider';
+import { callProvider, ChatMessage, TokenCounts } from './provider';
 
 // Normalize and sanitize incoming payload values.
 export function buildFacts(payload: Payload): Facts {
@@ -114,7 +114,7 @@ function policyViolations(o: Output, policy: Controls['policy']): {
   return { missing, banned };
 }
 
-const PROMPT_VERSION = '1';
+export const PROMPT_VERSION = '1';
 const RULES_VERSION = '1';
 
 export async function generateKit({
@@ -123,24 +123,41 @@ export async function generateKit({
 }: {
   facts: Facts;
   controls: Controls;
-}): Promise<{ outputs: Output; flags: string[]; promptVersion: string; rulesVersion: string }> {
+}): Promise<{
+  outputs: Output;
+  flags: string[];
+  promptVersion: string;
+  rulesVersion: string;
+  tokenCounts: TokenCounts;
+}> {
   const plan = controls.plan;
   const policy = controls.policy;
-  const draft = await callProvider(composeDraftMessages(facts), plan);
-  let critique = draft;
+  let tokenCounts: TokenCounts = { prompt: 0, completion: 0, total: 0 };
+  const draftRes = await callProvider(composeDraftMessages(facts), plan);
+  tokenCounts.prompt += draftRes.tokenCounts.prompt;
+  tokenCounts.completion += draftRes.tokenCounts.completion;
+  tokenCounts.total += draftRes.tokenCounts.total;
+  let critique = draftRes.output;
   try {
-    critique = await callProvider(
-      composeCritiqueMessages(facts, draft, policy),
+    const critRes = await callProvider(
+      composeCritiqueMessages(facts, critique, policy),
       plan
     );
-    let parsed = OutputSchema.parse(critique);
+    tokenCounts.prompt += critRes.tokenCounts.prompt;
+    tokenCounts.completion += critRes.tokenCounts.completion;
+    tokenCounts.total += critRes.tokenCounts.total;
+    let parsed = OutputSchema.parse(critRes.output);
     let pv = policyViolations(parsed, policy);
     if (pv.missing.length || pv.banned.length) {
       try {
-        critique = await callProvider(
+        const retryRes = await callProvider(
           composeCritiqueMessages(facts, parsed, policy, pv),
           plan
         );
+        tokenCounts.prompt += retryRes.tokenCounts.prompt;
+        tokenCounts.completion += retryRes.tokenCounts.completion;
+        tokenCounts.total += retryRes.tokenCounts.total;
+        critique = retryRes.output;
         parsed = OutputSchema.parse(critique);
       } catch (err) {
         console.warn('[pipeline] re-critique pass failed', err);
@@ -150,22 +167,37 @@ export async function generateKit({
     pv = policyViolations(outputs, policy);
     if (pv.missing.length || pv.banned.length) {
       try {
-        critique = await callProvider(
+        const postRes = await callProvider(
           composeCritiqueMessages(facts, outputs, policy, pv),
           plan
         );
-        outputs = postProcess(OutputSchema.parse(critique));
+        tokenCounts.prompt += postRes.tokenCounts.prompt;
+        tokenCounts.completion += postRes.tokenCounts.completion;
+        tokenCounts.total += postRes.tokenCounts.total;
+        outputs = postProcess(OutputSchema.parse(postRes.output));
       } catch (err) {
         console.warn('[pipeline] post-process critique pass failed', err);
       }
     }
     const flags = complianceScan(outputs);
-    return { outputs, flags, promptVersion: PROMPT_VERSION, rulesVersion: RULES_VERSION };
+    return {
+      outputs,
+      flags,
+      promptVersion: PROMPT_VERSION,
+      rulesVersion: RULES_VERSION,
+      tokenCounts,
+    };
   } catch (err) {
     console.warn('[pipeline] critique pass failed', err);
     const outputs = postProcess(OutputSchema.parse(critique));
     const flags = complianceScan(outputs);
-    return { outputs, flags, promptVersion: PROMPT_VERSION, rulesVersion: RULES_VERSION };
+    return {
+      outputs,
+      flags,
+      promptVersion: PROMPT_VERSION,
+      rulesVersion: RULES_VERSION,
+      tokenCounts,
+    };
   }
 }
 
