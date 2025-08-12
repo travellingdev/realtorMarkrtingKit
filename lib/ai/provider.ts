@@ -3,10 +3,17 @@ import { OutputJsonSchema, OutputSchema } from './schemas';
 
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 
+export type TokenCounts = { prompt: number; completion: number; total: number };
+
 const MODEL_FREE = process.env.OPENAI_MODEL_FREE || 'gpt-5-2025-08-07';
 const MODEL_PRO = process.env.OPENAI_MODEL_PRO || 'gpt-5-2025-08-07';
 
-async function request(messages: ChatMessage[], model: string, apiKey: string, timeoutMs: number): Promise<Output> {
+async function request(
+  messages: ChatMessage[],
+  model: string,
+  apiKey: string,
+  timeoutMs: number
+): Promise<{ output: Output; tokenCounts: TokenCounts }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -34,7 +41,13 @@ async function request(messages: ChatMessage[], model: string, apiKey: string, t
     const data: any = await res.json();
     const content = data?.choices?.[0]?.message?.content || '{}';
     const parsed = JSON.parse(content);
-    return OutputSchema.parse(parsed);
+    const usage = data?.usage || {};
+    const tokenCounts: TokenCounts = {
+      prompt: usage.prompt_tokens ?? 0,
+      completion: usage.completion_tokens ?? 0,
+      total: usage.total_tokens ?? 0,
+    };
+    return { output: OutputSchema.parse(parsed), tokenCounts };
   } finally {
     clearTimeout(timeout);
   }
@@ -46,7 +59,7 @@ export async function callProvider(
   messages: ChatMessage[],
   plan: 'FREE' | 'PRO' | 'TEAM' = 'FREE',
   options?: { timeoutMs?: number }
-): Promise<Output> {
+): Promise<{ output: Output; tokenCounts: TokenCounts }> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY not set');
   const model = plan === 'FREE' ? MODEL_FREE : MODEL_PRO;
