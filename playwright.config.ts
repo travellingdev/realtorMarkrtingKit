@@ -1,5 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// Provide default values for required environment variables so that the
+// Next.js app can start during tests without relying on external secrets.
+process.env.NEXT_PUBLIC_SUPABASE_URL ??= 'http://localhost:54321';
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= 'public-anon-key';
+process.env.SUPABASE_SERVICE_ROLE_KEY ??= 'service-role-key';
+
 // Use process.env.PORT by default and fallback to 3000 if not specified.
 const PORT = process.env.PORT || 3000;
 
@@ -48,9 +54,9 @@ export default defineConfig({
     },
   ],
 
-  /* Run your local dev server before starting the tests */
+  /* Run a production build before starting the tests */
   webServer: {
-    command: 'npm run dev',
+    command: 'npm run build && npm run start',
     url: baseURL,
     timeout: 120 * 1000,
     reuseExistingServer: !process.env.CI,
