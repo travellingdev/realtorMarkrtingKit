@@ -26,6 +26,7 @@ function buildPrompt(payload: Payload): string {
     `neighborhood: ${safe(payload.neighborhood)}`,
     `beds: ${safe(payload.beds)}; baths: ${safe(payload.baths)}; sqft: ${safe(payload.sqft)}`,
     `features: ${features}`,
+    `photos: ${(payload.photos || []).join(', ')}`,
     `propertyType: ${safe(payload.propertyType)}`,
     `tone: ${safe(payload.tone)}`,
     `brandVoice: ${safe(payload.brandVoice)}`,

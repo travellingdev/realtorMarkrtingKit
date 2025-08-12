@@ -4,6 +4,8 @@ import { useUser } from '@/app/providers/UserProvider';
 import { buildPayloadFromForm } from '@/lib/payloadBuilder';
 import { saveIntent } from '@/lib/intent';
 import { BASE_FREE_LIMIT } from '@/lib/constants';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
+import { uploadPhotos } from '@/lib/uploadPhotos';
 
 function computeFreeLimit(base: number, extraUnlocked: boolean) {
   return base + (extraUnlocked ? 1 : 0);
@@ -81,6 +83,15 @@ export function useRealtorKit() {
     setIsGenerating(true);
     try {
       console.log('[useRealtorKit] onGenerate begin');
+      let photoUrls: string[] = [];
+      try {
+        if (photos.length) {
+          const sb = supabaseBrowser();
+          photoUrls = await uploadPhotos(sb, photos, user.id);
+        }
+      } catch (err) {
+        console.warn('[useRealtorKit] photo upload failed', err);
+      }
       const { payload, controls } = buildPayloadFromForm({
         address,
         beds,
@@ -88,6 +99,7 @@ export function useRealtorKit() {
         sqft,
         neighborhood,
         features,
+        photos: photoUrls,
         propertyType,
         tone,
         brandVoice,

@@ -8,6 +8,7 @@ export const FactsSchema = z.object({
   baths: z.string().optional(),
   sqft: z.string().optional(),
   features: z.array(z.string()).default([]),
+  photos: z.array(z.string()).default([]),
   propertyType: z.string().optional(),
   tone: z.string().optional(),
   brandVoice: z.string().optional(),

@@ -8,6 +8,7 @@ export const PayloadSchema = z.object({
   sqft: z.string().optional(),
   neighborhood: z.string().optional(),
   features: z.array(z.string()).optional(),
+  photos: z.array(z.string()).optional(),
   tone: z.string().optional(),
   propertyType: z.string().optional(),
   brandVoice: z.string().optional(),
@@ -85,7 +86,10 @@ export function generateOutputs(
       ? `Open House \u2022 ${near} ${payload.beds || '?'}BR`
       : '',
     emailBody: include('email')
-      ? `Hi there,\n\nWe're opening the doors at ${addr}.`
+      ? `Hi there,\n\nWe're opening the doors at ${addr}.` +
+        (payload.photos && payload.photos.length
+          ? `\n\nPhotos:\n${payload.photos.join('\n')}`
+          : '')
       : '',
   };
 

@@ -8,6 +8,7 @@ export function buildPayloadFromForm({
   sqft,
   neighborhood,
   features,
+  photos,
   propertyType,
   tone,
   brandVoice,
@@ -34,6 +35,7 @@ export function buildPayloadFromForm({
   sqft: string;
   neighborhood: string;
   features: string;
+  photos: string[];
   propertyType: string;
   tone: string;
   brandVoice: string;
@@ -67,6 +69,7 @@ export function buildPayloadFromForm({
     sqft: toStr(sqft),
     neighborhood: toStr(neighborhood),
     features: featureList.length ? featureList : undefined,
+    photos: photos && photos.length ? photos : undefined,
     tone: toStr(tone),
     propertyType: toStr(propertyType),
     brandVoice: toStr(brandVoice),
