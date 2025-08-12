@@ -28,6 +28,22 @@ export default function RealtorsAIMarketingKit() {
     propertyType, setPropertyType,
     tone, setTone,
     brandVoice, setBrandVoice,
+    channels, setChannels,
+    openHouseDate, setOpenHouseDate,
+    openHouseTime, setOpenHouseTime,
+    openHouseLink, setOpenHouseLink,
+    ctaType, setCtaType,
+    ctaPhone, setCtaPhone,
+    ctaLink, setCtaLink,
+    ctaCustom, setCtaCustom,
+    socialHandle, setSocialHandle,
+    hashtagStrategy, setHashtagStrategy,
+    extraHashtags, setExtraHashtags,
+    readingLevel, setReadingLevel,
+    useEmojis, setUseEmojis,
+    mlsFormat, setMlsFormat,
+    mustInclude, setMustInclude,
+    avoidWords, setAvoidWords,
     outputs,
     revealed,
     kitSample,
@@ -159,6 +175,22 @@ export default function RealtorsAIMarketingKit() {
                 propertyType={propertyType} setPropertyType={setPropertyType}
                 tone={tone} setTone={setTone}
                 brandVoice={brandVoice} setBrandVoice={setBrandVoice}
+                channels={channels} setChannels={setChannels}
+                openHouseDate={openHouseDate} setOpenHouseDate={setOpenHouseDate}
+                openHouseTime={openHouseTime} setOpenHouseTime={setOpenHouseTime}
+                openHouseLink={openHouseLink} setOpenHouseLink={setOpenHouseLink}
+                ctaType={ctaType} setCtaType={setCtaType}
+                ctaPhone={ctaPhone} setCtaPhone={setCtaPhone}
+                ctaLink={ctaLink} setCtaLink={setCtaLink}
+                ctaCustom={ctaCustom} setCtaCustom={setCtaCustom}
+                socialHandle={socialHandle} setSocialHandle={setSocialHandle}
+                hashtagStrategy={hashtagStrategy} setHashtagStrategy={setHashtagStrategy}
+                extraHashtags={extraHashtags} setExtraHashtags={setExtraHashtags}
+                readingLevel={readingLevel} setReadingLevel={setReadingLevel}
+                useEmojis={useEmojis} setUseEmojis={setUseEmojis}
+                mlsFormat={mlsFormat} setMlsFormat={setMlsFormat}
+                mustInclude={mustInclude} setMustInclude={setMustInclude}
+                avoidWords={avoidWords} setAvoidWords={setAvoidWords}
                 onGenerate={onGenerate}
                 onUseSample={useSample}
                 isGenerating={isGenerating}
