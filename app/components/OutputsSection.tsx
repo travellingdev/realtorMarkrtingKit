@@ -2,6 +2,8 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ClipboardList, Copy, Instagram, Mail, PlayCircle } from 'lucide-react';
+import { canUseFeature } from '@/lib/tiers';
+import FeatureLock from './FeatureLock';
 
 function OutputCard({ title, icon: Icon, text, list, revealed, canCopy, disabledLabel, onCopy, onRequestAuth }:{
   title: string;
@@ -59,7 +61,7 @@ export function getDisabledLabel(revealed: boolean, isLoggedIn: boolean) {
   return !revealed && isLoggedIn ? 'Reveal to Copy' : 'Sign in to Copy';
 }
 
-export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAll, onRequestAuth, handleReveal, kitSample, isLoggedIn, kitStatus, onCopySuccess, onRetry, photoInsights, onGenerateHero }:{
+export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAll, onRequestAuth, handleReveal, kitSample, isLoggedIn, kitStatus, onCopySuccess, onRetry, photoInsights, onGenerateHero, userTier, onUpgrade }:{
   outputs: null | { mlsDesc: string; igSlides: string[]; reelScript: string[]; emailSubject: string; emailBody: string };
   revealed: boolean;
   canCopyAll: boolean;
@@ -73,6 +75,8 @@ export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAl
   onRetry?: () => void;
   photoInsights?: any;
   onGenerateHero?: () => void;
+  userTier?: string;
+  onUpgrade?: (tier: string) => void;
 }){
   const isProcessing = kitStatus === 'PROCESSING';
   const isFailed = kitStatus === 'FAILED';
@@ -131,52 +135,59 @@ export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAl
             
             {/* Hero Image Generation Section */}
             <div className="mt-6 border-t border-cyan-500/20 pt-4">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h4 className="font-medium text-cyan-300">Hero Image Generator</h4>
-                  <p className="text-xs text-white/60 mt-1">Create professional overlays for all platforms</p>
+              <FeatureLock
+                feature="heroImages"
+                currentTier={userTier || 'FREE'}
+                title="Hero Image Generator"
+                description="Create professional overlays optimized for all marketing platforms"
+                onUpgrade={onUpgrade}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h4 className="font-medium text-cyan-300">Hero Image Generator</h4>
+                    <p className="text-xs text-white/60 mt-1">Create professional overlays for all platforms</p>
+                  </div>
+                  {onGenerateHero && canUseFeature(userTier || 'FREE', 'heroImages') && (
+                    <button 
+                      onClick={onGenerateHero}
+                      className="rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 px-4 py-2 text-sm text-cyan-300 transition"
+                    >
+                      Generate Hero Images →
+                    </button>
+                  )}
                 </div>
-                {onGenerateHero && (
-                  <button 
-                    onClick={onGenerateHero}
-                    className="rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 px-4 py-2 text-sm text-cyan-300 transition"
-                  >
-                    Generate Hero Images →
-                  </button>
-                )}
-              </div>
-              
-              {/* Overlay Style Options */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-2 text-center">
-                  <div className="text-blue-300 font-medium">Modern</div>
-                  <div className="text-white/50">Clean & minimal</div>
+                {/* Overlay Style Options */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                  <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-2 text-center">
+                    <div className="text-blue-300 font-medium">Modern</div>
+                    <div className="text-white/50">Clean & minimal</div>
+                  </div>
+                  <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-2 text-center">
+                    <div className="text-yellow-300 font-medium">Luxury</div>
+                    <div className="text-white/50">Premium gold</div>
+                  </div>
+                  <div className="rounded-lg bg-gray-500/10 border border-gray-500/20 p-2 text-center">
+                    <div className="text-gray-300 font-medium">Minimal</div>
+                    <div className="text-white/50">Subtle overlay</div>
+                  </div>
+                  <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-2 text-center">
+                    <div className="text-red-300 font-medium">Bold</div>
+                    <div className="text-white/50">Eye-catching</div>
+                  </div>
                 </div>
-                <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-2 text-center">
-                  <div className="text-yellow-300 font-medium">Luxury</div>
-                  <div className="text-white/50">Premium gold</div>
+                
+                {/* Platform Preview */}
+                <div className="mt-4 text-xs">
+                  <div className="text-white/70 mb-2">Will generate optimized versions for:</div>
+                  <div className="flex flex-wrap gap-1">
+                    {['Facebook', 'Instagram', 'Stories', 'Email', 'Website', 'Print'].map(platform => (
+                      <span key={platform} className="bg-white/10 rounded px-2 py-1 text-white/60">
+                        {platform}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                <div className="rounded-lg bg-gray-500/10 border border-gray-500/20 p-2 text-center">
-                  <div className="text-gray-300 font-medium">Minimal</div>
-                  <div className="text-white/50">Subtle overlay</div>
-                </div>
-                <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-2 text-center">
-                  <div className="text-red-300 font-medium">Bold</div>
-                  <div className="text-white/50">Eye-catching</div>
-                </div>
-              </div>
-              
-              {/* Platform Preview */}
-              <div className="mt-4 text-xs">
-                <div className="text-white/70 mb-2">Will generate optimized versions for:</div>
-                <div className="flex flex-wrap gap-1">
-                  {['Facebook', 'Instagram', 'Stories', 'Email', 'Website', 'Print'].map(platform => (
-                    <span key={platform} className="bg-white/10 rounded px-2 py-1 text-white/60">
-                      {platform}
-                    </span>
-                  ))}
-                </div>
-              </div>
+              </FeatureLock>
             </div>
           </div>
         )}

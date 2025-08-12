@@ -3,6 +3,7 @@ import type { Output, Facts, Controls } from './schemas';
 import { FactsSchema, OutputSchema } from './schemas';
 import { callProvider, ChatMessage, TokenCounts } from './provider';
 import { analyzePhotosWithVision, enhanceContentWithInsights, type PhotoInsights } from './photoAnalysis';
+import type { TierConfig } from '@/lib/tiers';
 
 // Normalize and sanitize incoming payload values.
 export function buildFacts(payload: Payload): Facts {
@@ -204,9 +205,11 @@ const RULES_VERSION = '1';
 export async function generateKit({
   facts,
   controls,
+  tierConfig,
 }: {
   facts: Facts;
   controls: Controls;
+  tierConfig?: TierConfig;
 }): Promise<{
   outputs: Output;
   flags: string[];

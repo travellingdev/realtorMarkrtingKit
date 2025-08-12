@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseClients';
 import { processHeroImage, type HeroImageOptions } from '@/lib/ai/heroImage';
+import { getTierConfig, canUseFeature } from '@/lib/tiers';
 
 export async function POST(req: Request) {
   const sb = supabaseServer();
@@ -8,6 +9,22 @@ export async function POST(req: Request) {
   
   if (!user) {
     return NextResponse.json({ error: 'auth' }, { status: 401 });
+  }
+
+  // Check user tier and hero image permissions
+  const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  const userTier = profile?.plan || 'FREE';
+  
+  if (!canUseFeature(userTier, 'heroImages')) {
+    return NextResponse.json({ 
+      error: 'feature_locked', 
+      details: {
+        feature: 'heroImages',
+        tier: userTier,
+        upgradeRequired: true,
+        message: 'Hero image generation requires Professional tier or higher'
+      }
+    }, { status: 403 });
   }
 
   try {

@@ -1,6 +1,8 @@
 "use client";
 import React from 'react';
-import { Image as ImageIcon } from 'lucide-react';
+import { Image as ImageIcon, Crown, Lock } from 'lucide-react';
+import { canUseFeature } from '@/lib/tiers';
+import FeatureLock from './FeatureLock';
 
 type InstantDemoFormProps = {
   address: string;
@@ -61,6 +63,8 @@ type InstantDemoFormProps = {
   onUseSample: () => void;
   isGenerating?: boolean;
   generationStage?: 'uploading' | 'analyzing' | 'selecting' | 'generating' | 'complete';
+  userTier?: string;
+  onUpgrade?: (tier: string) => void;
 };
 
 function LabeledInput({ label, value, onChange, type = "text", placeholder }:{label:string; value:string; onChange:(v:string)=>void; type?:string; placeholder?:string;}){
@@ -165,47 +169,59 @@ export default function InstantDemoForm(props: InstantDemoFormProps){
       </div>
 
       <div className="mt-4">
-        <label className="block">
-          <div className="text-sm text-white/80 mb-2">
-            <ImageIcon className="h-4 w-4 inline mr-2" />
-            Photos (for enhanced AI analysis)
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-neutral-950/50 p-4">
-            <input
-              aria-label="Upload photos"
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={(e) => props.setPhotos(Array.from(e.target.files || []))}
-              className="block w-full text-sm file:mr-3 file:rounded-xl file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-neutral-900 hover:file:opacity-90"
-            />
-            {photos?.length ? (
-              <div className="mt-3 space-y-2">
-                <div className="flex items-center gap-2 text-sm text-white/80">
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-500/20 text-green-400 text-xs">
-                    ✓
-                  </span>
-                  {photos.length} photo{photos.length > 1 ? 's' : ''} ready for AI analysis
+        <FeatureLock
+          feature="vision"
+          currentTier={props.userTier || 'FREE'}
+          title="AI Photo Analysis"
+          description="Upload property photos for enhanced AI analysis and smart content generation"
+          onUpgrade={props.onUpgrade}
+        >
+          <label className="block">
+            <div className="text-sm text-white/80 mb-2">
+              <ImageIcon className="h-4 w-4 inline mr-2" />
+              Photos (for enhanced AI analysis)
+              {!canUseFeature(props.userTier || 'FREE', 'vision') && (
+                <Lock className="h-4 w-4 inline ml-2 text-yellow-400" />
+              )}
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-neutral-950/50 p-4">
+              <input
+                aria-label="Upload photos"
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => props.setPhotos(Array.from(e.target.files || []))}
+                className="block w-full text-sm file:mr-3 file:rounded-xl file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-neutral-900 hover:file:opacity-90"
+                disabled={!canUseFeature(props.userTier || 'FREE', 'vision')}
+              />
+              {photos?.length && canUseFeature(props.userTier || 'FREE', 'vision') ? (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-white/80">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-500/20 text-green-400 text-xs">
+                      ✓
+                    </span>
+                    {photos.length} photo{photos.length > 1 ? 's' : ''} ready for AI analysis
+                  </div>
+                  <div className="text-xs text-white/60">
+                    AI will analyze your photos to create enhanced descriptions that highlight your property&apos;s best features
+                  </div>
                 </div>
-                <div className="text-xs text-white/60">
-                  AI will analyze your photos to create enhanced descriptions that highlight your property&apos;s best features
+              ) : (
+                <div className="mt-3 text-xs text-white/60">
+                  <div className="mb-1">💡 Pro tip: Include these photos for best AI results:</div>
+                  <div className="grid grid-cols-2 gap-1 text-white/50">
+                    <span>• Front exterior</span>
+                    <span>• Kitchen</span>
+                    <span>• Living room</span>
+                    <span>• Master bedroom</span>
+                    <span>• Best feature (pool, view, etc.)</span>
+                    <span>• Any unique selling points</span>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="mt-3 text-xs text-white/60">
-                <div className="mb-1">💡 Pro tip: Include these photos for best AI results:</div>
-                <div className="grid grid-cols-2 gap-1 text-white/50">
-                  <span>• Front exterior</span>
-                  <span>• Kitchen</span>
-                  <span>• Living room</span>
-                  <span>• Master bedroom</span>
-                  <span>• Best feature (pool, view, etc.)</span>
-                  <span>• Any unique selling points</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </label>
+              )}
+            </div>
+          </label>
+        </FeatureLock>
       </div>
 
       <div className="mt-6 grid md:grid-cols-2 gap-6">

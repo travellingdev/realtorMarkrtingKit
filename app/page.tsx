@@ -15,6 +15,7 @@ import AuthModal from "./components/AuthModal";
 import SurveyModal from "./components/SurveyModal";
 import { useRealtorKit } from "@/app/hooks/useRealtorKit";
 import { PROPERTY_TEMPLATES, TONES, BASE_FREE_LIMIT } from "@/lib/constants";
+import { openCheckout } from "@/lib/billing";
 
 export default function RealtorsAIMarketingKit() {
   const {
@@ -48,6 +49,7 @@ export default function RealtorsAIMarketingKit() {
     revealed,
     kitSample,
     isLoggedIn,
+    userTier,
     kitStatus,
     isGenerating,
     freeKitsUsed,
@@ -83,6 +85,43 @@ export default function RealtorsAIMarketingKit() {
   const unlockOneMore = () => {
     setShowPaywall(false);
     setShowSurvey(true);
+  };
+
+  const handleUpgrade = async (targetTier: string) => {
+    if (!isLoggedIn) {
+      setShowAuth(true);
+      return;
+    }
+
+    // Map new tier names to existing billing system
+    const billingTierMap: Record<string, 'PRO' | 'TEAM'> = {
+      'STARTER': 'PRO',
+      'PROFESSIONAL': 'PRO', 
+      'PREMIUM': 'PRO',
+      'TEAM': 'TEAM'
+    };
+
+    const billingTier = billingTierMap[targetTier];
+    if (!billingTier) {
+      console.error('Unknown tier:', targetTier);
+      return;
+    }
+
+    try {
+      setIsCheckingOut(true);
+      const result = await openCheckout(billingTier);
+      if (result.upgraded) {
+        refresh(); // Refresh user data
+        setCopyToast(`Successfully upgraded to ${targetTier}!`);
+        setTimeout(() => setCopyToast(''), 3000);
+      }
+    } catch (error) {
+      console.error('Upgrade failed:', error);
+      setCopyToast('Upgrade failed. Please try again.');
+      setTimeout(() => setCopyToast(''), 3000);
+    } finally {
+      setIsCheckingOut(false);
+    }
   };
 
   const onSurveySubmit = async () => {
@@ -206,6 +245,8 @@ export default function RealtorsAIMarketingKit() {
                 onGenerate={onGenerate}
                 onUseSample={useSample}
                 isGenerating={isGenerating}
+                userTier={userTier}
+                onUpgrade={handleUpgrade}
               />
             </div>
           </div>
@@ -249,6 +290,8 @@ export default function RealtorsAIMarketingKit() {
         onRetry={onGenerate}
         photoInsights={photoInsights}
         onGenerateHero={generateHeroImages}
+        userTier={userTier}
+        onUpgrade={handleUpgrade}
       />
 
       <Pricing />

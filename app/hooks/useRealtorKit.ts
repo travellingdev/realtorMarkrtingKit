@@ -13,8 +13,9 @@ function computeFreeLimit(base: number, extraUnlocked: boolean) {
 
 export function useRealtorKit() {
   // --- Auth & gating state ---
-  const { user, quota, refresh } = useUser();
+  const { user, plan, quota, refresh } = useUser();
   const isLoggedIn = !!user;
+  const userTier = plan || 'FREE';
   const [showAuth, setShowAuth] = useState(false);
   const [extraUnlocked, setExtraUnlocked] = useState(false);
   const [freeKitsUsed, setFreeKitsUsed] = useState(0);
@@ -378,6 +379,7 @@ export function useRealtorKit() {
     kitStatus,
     kitSample,
     isLoggedIn,
+    userTier,
     freeKitsUsed,
     freeLimit,
     outputs,

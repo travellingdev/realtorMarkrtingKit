@@ -4,6 +4,7 @@ import { supabaseServer, supabaseAdmin } from '@/lib/supabaseClients';
 import { generateOutputs, PayloadSchema } from '@/lib/generator';
 import { buildFacts, generateKit, PROMPT_VERSION } from '@/lib/ai/pipeline';
 import { ControlsSchema } from '@/lib/ai/schemas';
+import { getTierConfig, canUseFeature, isQuotaExceeded } from '@/lib/tiers';
 
 export async function POST(req: Request) {
   const startedAt = Date.now();
@@ -13,7 +14,34 @@ export async function POST(req: Request) {
     console.warn('[api/generate] unauthenticated request');
     return NextResponse.json({ error: 'auth' }, { status: 401 });
   }
-  console.log('[api/generate] begin', { userId: user.id });
+  
+  // Get user profile and tier information
+  const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  const userTier = profile?.plan || 'FREE';
+  const tierConfig = getTierConfig(userTier);
+  const quotaUsed = profile?.quota_used || 0;
+  const extraQuota = profile?.quota_extra || 0;
+  
+  console.log('[api/generate] begin', { 
+    userId: user.id, 
+    tier: userTier, 
+    quotaUsed, 
+    limit: tierConfig.kitsPerMonth + extraQuota 
+  });
+  
+  // Check quota limits
+  if (isQuotaExceeded(userTier, quotaUsed, extraQuota)) {
+    console.warn('[api/generate] quota exceeded', { userId: user.id, tier: userTier, used: quotaUsed });
+    return NextResponse.json({ 
+      error: 'quota_exceeded', 
+      details: {
+        tier: userTier,
+        used: quotaUsed,
+        limit: tierConfig.kitsPerMonth + extraQuota,
+        upgradeRequired: true
+      }
+    }, { status: 429 });
+  }
   const body = await req.json().catch(() => ({}));
   const payload = body.payload;
   const rawControls = body.controls ?? {};
@@ -94,7 +122,28 @@ export async function POST(req: Request) {
 
   // Try AI with photo analysis first; fallback to local deterministic generator on failure
   try {
-    const { outputs, flags, promptVersion, tokenCounts, photoInsights } = await generateKit({ facts, controls: controlsData });
+    // Apply tier-based feature gating
+    const tierAwareFacts = { ...facts };
+    const tierAwareControls = { ...controlsData };
+    
+    // Remove photos if vision is not available in tier
+    if (!canUseFeature(userTier, 'vision')) {
+      tierAwareFacts.photos = [];
+      console.log('[api/generate] Vision disabled for tier', { userId: user.id, tier: userTier });
+    }
+    
+    // Filter channels if not all platforms available
+    if (!canUseFeature(userTier, 'allPlatforms')) {
+      // Starter tier gets basic platforms only
+      tierAwareControls.channels = ['mls', 'email'];
+      console.log('[api/generate] Platform filtering for tier', { userId: user.id, tier: userTier });
+    }
+    
+    const { outputs, flags, promptVersion, tokenCounts, photoInsights } = await generateKit({ 
+      facts: tierAwareFacts, 
+      controls: tierAwareControls,
+      tierConfig 
+    });
     const latencyMs = Date.now() - startedAt;
     const qualityScore = Math.max(0, 100 - flags.length * 10);
     
