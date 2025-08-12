@@ -64,18 +64,26 @@ export function useRealtorKit() {
     if (isGenerating) return;
     setIsGenerating(true);
     try {
+      console.log('[useRealtorKit] onGenerate begin');
       const payload = buildPayloadFromForm({ address, beds, baths, sqft, neighborhood, features, propertyType, tone, brandVoice });
+      console.log('[useRealtorKit] payload', {
+        hasAddress: Boolean(address), hasBeds: Boolean(beds), hasBaths: Boolean(baths), hasSqft: Boolean(sqft), hasNeighborhood: Boolean(neighborhood),
+        featuresCount: features.split(',').filter(Boolean).length,
+        propertyType, tone,
+      });
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
+        console.warn('[useRealtorKit] /api/generate failed', { status: res.status });
         setCopyToast('Failed to generate. Please try again.');
         setTimeout(() => setCopyToast(''), 1600);
         return;
       }
       const data = await res.json().catch(() => null);
+      console.log('[useRealtorKit] /api/generate ok', { kitId: data?.kitId });
       if (data?.kitId) setKitId(data.kitId);
       setKitSample(false);
       setKitConsumed(false);
@@ -93,17 +101,19 @@ export function useRealtorKit() {
               if (j?.status === 'READY' && j.outputs) {
                 setServerOutputs(j.outputs);
                 setKitStatus('READY');
+                console.log('[useRealtorKit] kit ready', { ms: Date.now() - start });
                 return;
               }
               if (j?.status === 'FAILED') {
                 setKitStatus('FAILED');
                 setCopyToast('Generation failed. Please try again.');
                 setTimeout(() => setCopyToast(''), 2000);
+                console.warn('[useRealtorKit] kit failed');
                 return;
               }
             }
           } catch (_) {
-            // ignore and keep polling
+            console.warn('[useRealtorKit] poll error');
           }
           if (Date.now() - start < 30000) {
             setTimeout(poll, 1000);
@@ -111,6 +121,7 @@ export function useRealtorKit() {
             setKitStatus('FAILED');
             setCopyToast('Generation timed out. Please try again.');
             setTimeout(() => setCopyToast(''), 2000);
+            console.warn('[useRealtorKit] poll timeout');
           }
         };
         poll();
@@ -157,24 +168,31 @@ export function useRealtorKit() {
       return;
     }
     try {
+      console.log('[useRealtorKit] reveal begin');
       const res = await fetch('/api/reveal', { method: 'POST' });
       if (res.status === 401) {
+        console.warn('[useRealtorKit] reveal unauthorized');
         setShowAuth(true);
         return;
       }
       if (res.status === 402) {
+        const data = await res.json().catch(() => null);
+        console.warn('[useRealtorKit] reveal paywall', { used: data?.used, limit: data?.limit });
         // setShowPaywall(true); // This state is not in the hook
         return;
       }
       if (!res.ok) {
+        console.warn('[useRealtorKit] reveal failed', { status: res.status });
         // setShowPaywall(true);
         return;
       }
       const data = await res.json().catch(() => null);
+      console.log('[useRealtorKit] reveal ok', { used: data?.used, limit: data?.limit });
       if (data && typeof data.used === 'number') setFreeKitsUsed(data.used);
       setKitConsumed(true);
       setRevealed(true);
     } catch (_) {
+      console.warn('[useRealtorKit] reveal error');
       // setShowPaywall(true);
     }
   };

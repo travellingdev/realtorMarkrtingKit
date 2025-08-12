@@ -1,5 +1,5 @@
 'use client';
-import React, { useRef } from "react";
+import React, { useRef,useState } from "react";
 import {
   Sparkles,
   LogIn,
@@ -14,7 +14,7 @@ import Pricing from "./components/Pricing";
 import AuthModal from "./components/AuthModal";
 import SurveyModal from "./components/SurveyModal";
 import { useRealtorKit } from "@/app/hooks/useRealtorKit";
-import { PROPERTY_TEMPLATES, TONES } from "@/lib/constants";
+import { PROPERTY_TEMPLATES, TONES, BASE_FREE_LIMIT } from "@/lib/constants";
 
 export default function RealtorsAIMarketingKit() {
   const {

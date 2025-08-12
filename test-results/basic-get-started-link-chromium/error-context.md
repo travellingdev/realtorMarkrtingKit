@@ -5,14 +5,10 @@
   - img
   - text: Realtor's AI Marketing Kit
   - navigation:
-    - link "How it works":
-      - /url: "#how"
     - link "Outputs":
       - /url: "#outputs"
     - link "Pricing":
       - /url: "#pricing"
-    - link "FAQ":
-      - /url: "#faq"
   - button "Sign in":
     - img
     - text: Sign in
@@ -154,5 +150,4 @@
     - img
     - text: Analytics
 - button "Contact Sales"
-- alert
 ```

@@ -7,8 +7,8 @@ type OpenAIChatResponse = {
   }>;
 };
 
-const MODEL_FREE = process.env.OPENAI_MODEL_FREE || 'gpt-4o-mini';
-const MODEL_PRO = process.env.OPENAI_MODEL_PRO || 'gpt-4o-mini';
+const MODEL_FREE = process.env.OPENAI_MODEL_FREE || 'gpt-5-2025-08-07';
+const MODEL_PRO = process.env.OPENAI_MODEL_PRO || 'gpt-5-2025-08-07';
 
 function buildPrompt(payload: Payload): string {
   const safe = (v?: string) => (v ? v : '');
@@ -49,6 +49,7 @@ export async function generateOutputsWithOpenAI(payload: Payload, plan: 'FREE' |
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options?.timeoutMs ?? 15000);
   try {
+    console.log('[openai] request', { model, plan });
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -57,7 +58,7 @@ export async function generateOutputsWithOpenAI(payload: Payload, plan: 'FREE' |
       },
       body: JSON.stringify({
         model,
-        temperature: 0.6,
+        temperature: 1,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: 'You are a helpful assistant.' },
@@ -68,10 +69,12 @@ export async function generateOutputsWithOpenAI(payload: Payload, plan: 'FREE' |
     });
     if (!res.ok) {
       const txt = await res.text().catch(() => '');
+      console.error('[openai] error', { status: res.status, txt: txt?.slice?.(0, 500) });
       throw new Error(`OpenAI error: ${res.status} ${txt}`);
     }
     const data = (await res.json()) as OpenAIChatResponse;
     const content = data.choices?.[0]?.message?.content || '{}';
+    console.log('[openai] success');
     const parsed = JSON.parse(content);
     // Basic shape validation
     if (!parsed || typeof parsed !== 'object') throw new Error('Invalid JSON from AI');
