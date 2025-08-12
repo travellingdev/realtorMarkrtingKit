@@ -3,13 +3,14 @@ import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ClipboardList, Copy, Instagram, Mail, PlayCircle } from 'lucide-react';
 
-function OutputCard({ title, icon: Icon, text, list, revealed, canCopy, onCopy, onRequestAuth }:{
+function OutputCard({ title, icon: Icon, text, list, revealed, canCopy, disabledLabel, onCopy, onRequestAuth }:{
   title: string;
   icon: React.ComponentType<{ className?: string }>;
   text?: string;
   list?: string[];
   revealed: boolean;
   canCopy: boolean;
+  disabledLabel?: string;
   onCopy: () => void;
   onRequestAuth: () => void;
 }){
@@ -36,7 +37,7 @@ function OutputCard({ title, icon: Icon, text, list, revealed, canCopy, onCopy, 
             canCopy ? 'border-white/10 bg-white text-neutral-900 hover:opacity-90' : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10'
           }`}
         >
-          <Copy className="h-4 w-4" /> {canCopy ? 'Copy' : 'Sign in to Copy'}
+          <Copy className="h-4 w-4" /> {canCopy ? 'Copy' : (disabledLabel || 'Sign in to Copy')}
         </button>
       </div>
 
@@ -54,6 +55,10 @@ function OutputCard({ title, icon: Icon, text, list, revealed, canCopy, onCopy, 
 
 import SkeletonLoader from './SkeletonLoader';
 
+export function getDisabledLabel(revealed: boolean, isLoggedIn: boolean) {
+  return !revealed && isLoggedIn ? 'Reveal to Copy' : 'Sign in to Copy';
+}
+
 export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAll, onRequestAuth, handleReveal, kitSample, isLoggedIn, kitStatus }:{
   outputs: null | { mlsDesc: string; igSlides: string[]; reelScript: string[]; emailSubject: string; emailBody: string };
   revealed: boolean;
@@ -66,6 +71,7 @@ export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAl
   kitStatus: null | 'PROCESSING' | 'READY' | 'FAILED';
 }){
   const isProcessing = kitStatus === 'PROCESSING';
+  const copyDisabledLabel = getDisabledLabel(revealed, isLoggedIn);
 
   return (
     <section id="outputs" className="relative">
@@ -103,6 +109,7 @@ export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAl
                 text={outputs?.mlsDesc}
                 revealed={revealed}
                 canCopy={kitSample ? isLoggedIn : revealed}
+                disabledLabel={copyDisabledLabel}
                 onCopy={() => outputs && navigator.clipboard.writeText(outputs.mlsDesc)}
                 onRequestAuth={onRequestAuth}
               />
@@ -112,6 +119,7 @@ export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAl
                 list={outputs?.igSlides}
                 revealed={revealed}
                 canCopy={kitSample ? isLoggedIn : revealed}
+                disabledLabel={copyDisabledLabel}
                 onCopy={() => outputs && navigator.clipboard.writeText(outputs.igSlides.join('\n'))}
                 onRequestAuth={onRequestAuth}
               />
@@ -121,6 +129,7 @@ export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAl
                 list={outputs?.reelScript}
                 revealed={revealed}
                 canCopy={kitSample ? isLoggedIn : revealed}
+                disabledLabel={copyDisabledLabel}
                 onCopy={() => outputs && navigator.clipboard.writeText(outputs.reelScript.join('\n'))}
                 onRequestAuth={onRequestAuth}
               />
@@ -130,6 +139,7 @@ export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAl
                 text={outputs ? `Subject: ${outputs.emailSubject}\n\n${outputs.emailBody}` : undefined}
                 revealed={revealed}
                 canCopy={kitSample ? isLoggedIn : revealed}
+                disabledLabel={copyDisabledLabel}
                 onCopy={() => outputs && navigator.clipboard.writeText(`Subject: ${outputs.emailSubject}\n\n${outputs.emailBody}`)}
                 onRequestAuth={onRequestAuth}
               />
