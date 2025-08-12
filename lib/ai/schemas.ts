@@ -18,6 +18,20 @@ export type Facts = z.infer<typeof FactsSchema>;
 // room for future knobs.
 export const ControlsSchema = z.object({
   plan: z.enum(['FREE', 'PRO', 'TEAM']).default('FREE'),
+  channels: z.array(z.string()).default([]),
+  openHouseDate: z.string().optional(),
+  openHouseTime: z.string().optional(),
+  openHouseLink: z.string().optional(),
+  ctaType: z.string().optional(),
+  ctaPhone: z.string().optional(),
+  ctaLink: z.string().optional(),
+  ctaCustom: z.string().optional(),
+  socialHandle: z.string().optional(),
+  hashtagStrategy: z.string().optional(),
+  extraHashtags: z.string().optional(),
+  readingLevel: z.string().optional(),
+  useEmojis: z.boolean().default(false),
+  mlsFormat: z.string().optional(),
   policy: z
     .object({
       mustInclude: z.array(z.string()).default([]),
