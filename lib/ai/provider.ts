@@ -17,6 +17,7 @@ async function request(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    console.log('[provider] request', { model, timeoutMs, msgCount: messages.length });
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -36,6 +37,7 @@ async function request(
     });
     if (!res.ok) {
       const txt = await res.text().catch(() => '');
+      console.error('[provider] error', { status: res.status, body: txt?.slice?.(0, 400) });
       throw new Error(`OpenAI error: ${res.status} ${txt}`);
     }
     const data: any = await res.json();
@@ -47,6 +49,7 @@ async function request(
       completion: usage.completion_tokens ?? 0,
       total: usage.total_tokens ?? 0,
     };
+    console.log('[provider] success', { tokens: tokenCounts });
     return { output: OutputSchema.parse(parsed), tokenCounts };
   } finally {
     clearTimeout(timeout);
@@ -71,6 +74,7 @@ export async function callProvider(
       return await request(messages, model, apiKey, timeoutMs);
     } catch (err) {
       lastErr = err;
+      console.warn('[provider] attempt failed', { attempt, error: String(err) });
       // Retry once on JSON parse or validation errors
       if (attempt === 0) continue;
     }

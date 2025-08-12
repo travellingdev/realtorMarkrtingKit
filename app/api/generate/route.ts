@@ -15,9 +15,10 @@ export async function POST(req: Request) {
   }
   console.log('[api/generate] begin', { userId: user.id });
   const body = await req.json().catch(() => ({}));
-  const payload = body.payload;
-  const rawControls = body.controls ?? {};
-  const payloadParse = PayloadSchema.safeParse(payload);
+  // Backward-compat: accept either envelope { payload, controls } or a raw payload object
+  const payloadRaw = (body && typeof body === 'object' && 'payload' in body) ? (body as any).payload : body;
+  const rawControls = (body && typeof body === 'object' && 'controls' in body) ? (body as any).controls : {};
+  const payloadParse = PayloadSchema.safeParse(payloadRaw);
   if (!payloadParse.success) {
     console.warn('[api/generate] bad_request', { userId: user.id, issues: payloadParse.error.issues?.slice?.(0, 3) });
     return NextResponse.json({ error: 'bad_request', details: payloadParse.error.flatten() }, { status: 400 });
@@ -94,31 +95,34 @@ export async function POST(req: Request) {
 
   // Try AI first; fallback to local deterministic generator on failure
   try {
-    const { outputs, flags, promptVersion, tokenCounts } = await generateKit({ facts, controls: controlsData });
+    console.log('[api/generate] invoking pipeline', { userId: user.id, plan: controlsData.plan, promptVersion });
+    const { outputs, flags, promptVersion: generatedPromptVersion, tokenCounts } = await generateKit({ facts, controls: controlsData });
+    const combinedFlags = ['ai', `plan:${controlsData.plan}`, ...flags];
     const latencyMs = Date.now() - startedAt;
     const qualityScore = Math.max(0, 100 - flags.length * 10);
     await updateKitReady({
       outputs,
-      flags,
+      flags: combinedFlags,
       latency_ms: latencyMs,
       token_counts: tokenCounts,
       quality_score: qualityScore,
-      prompt_version: promptVersion,
+      prompt_version: generatedPromptVersion,
     });
-    console.log('[api/generate] AI generation success', { userId: user.id, kitId: kit.id, ms: latencyMs });
+    console.log('[api/generate] AI generation success', { userId: user.id, kitId: kit.id, ms: latencyMs, flags: combinedFlags, tokens: tokenCounts, promptVersion: generatedPromptVersion });
   } catch (e: any) {
     console.error('[api/generate] AI generation failed, falling back', { userId: user.id, kitId: kit.id, error: String(e?.message || e) });
     const outputsLocal = generateOutputs(payloadData);
     const latencyMs = Date.now() - startedAt;
+    const reason = e?.name === 'AbortError' ? 'timeout' : 'provider';
     await updateKitReady({
       outputs: outputsLocal,
-      flags: [],
+      flags: ['fallback', `reason:${reason}`],
       latency_ms: latencyMs,
       token_counts: { prompt: 0, completion: 0, total: 0 },
       quality_score: 100,
       prompt_version: null,
     });
-    console.log('[api/generate] local generation success', { userId: user.id, kitId: kit.id, ms: latencyMs });
+    console.log('[api/generate] local generation success', { userId: user.id, kitId: kit.id, ms: latencyMs, flags: ['fallback', `reason:${reason}`] });
   }
 
   console.log('[api/generate] done', { userId: user.id, ms: Date.now() - startedAt });

@@ -133,16 +133,20 @@ export async function generateKit({
   const plan = controls.plan;
   const policy = controls.policy;
   let tokenCounts: TokenCounts = { prompt: 0, completion: 0, total: 0 };
+  console.log('[pipeline] draft begin', { plan });
   const draftRes = await callProvider(composeDraftMessages(facts), plan);
+  console.log('[pipeline] draft ok', { tokens: draftRes.tokenCounts });
   tokenCounts.prompt += draftRes.tokenCounts.prompt;
   tokenCounts.completion += draftRes.tokenCounts.completion;
   tokenCounts.total += draftRes.tokenCounts.total;
   let critique = draftRes.output;
   try {
+    console.log('[pipeline] critique begin');
     const critRes = await callProvider(
       composeCritiqueMessages(facts, critique, policy),
       plan
     );
+    console.log('[pipeline] critique ok', { tokens: critRes.tokenCounts });
     tokenCounts.prompt += critRes.tokenCounts.prompt;
     tokenCounts.completion += critRes.tokenCounts.completion;
     tokenCounts.total += critRes.tokenCounts.total;
@@ -150,10 +154,12 @@ export async function generateKit({
     let pv = policyViolations(parsed, policy);
     if (pv.missing.length || pv.banned.length) {
       try {
+        console.log('[pipeline] re-critique begin');
         const retryRes = await callProvider(
           composeCritiqueMessages(facts, parsed, policy, pv),
           plan
         );
+        console.log('[pipeline] re-critique ok', { tokens: retryRes.tokenCounts });
         tokenCounts.prompt += retryRes.tokenCounts.prompt;
         tokenCounts.completion += retryRes.tokenCounts.completion;
         tokenCounts.total += retryRes.tokenCounts.total;
@@ -167,10 +173,12 @@ export async function generateKit({
     pv = policyViolations(outputs, policy);
     if (pv.missing.length || pv.banned.length) {
       try {
+        console.log('[pipeline] post-critique begin');
         const postRes = await callProvider(
           composeCritiqueMessages(facts, outputs, policy, pv),
           plan
         );
+        console.log('[pipeline] post-critique ok', { tokens: postRes.tokenCounts });
         tokenCounts.prompt += postRes.tokenCounts.prompt;
         tokenCounts.completion += postRes.tokenCounts.completion;
         tokenCounts.total += postRes.tokenCounts.total;
