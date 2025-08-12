@@ -122,7 +122,7 @@ export default function RealtorsAIMarketingKit() {
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 shadow-lg shadow-cyan-500/20">
               <Sparkles className="h-5 w-5" />
             </span>
-            <div className="font-semibold tracking-tight">Realtor's AI Marketing Kit</div>
+            <div className="font-semibold tracking-tight">Realtor&apos;s AI Marketing Kit</div>
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm text-white/80">
             <a href="#outputs" className="hover:text-white">Outputs</a>

@@ -286,7 +286,7 @@ export function useRealtorKit() {
     const emailSubject = `Open House ${nearby ? `• ${nearby} ` : ""}${beds || "?"}BR`;
     const emailBody = `Hi there,\n\nWe're opening the doors at ${addr}. Quick look:\n\n• ${beds || "?"} bed / ${baths || "?"} bath${sqft ? ` • ${sqft} sq ft` : ""}\n• ${toFeatureList.length ? toFeatureList.slice(0, 4).join("\n• ") : "Bright, functional, great location"}\n• Near ${nearby} amenities\n\nOpen House: Sat 11–1\nReply to RSVP or request the full photo tour.\n\nBest,\nYour Realtor`;
     return { mlsDesc: styledDesc, igSlides, reelScript, emailSubject, emailBody };
-  }, [generated, address, beds, baths, sqft, neighborhood, toFeatureList, tone, propertyType, brandVoice, photos]);
+  }, [generated, address, beds, baths, sqft, toFeatureList, brandVoice, nearby]);
 
   const outputs = kitSample ? sampleOutputs : serverOutputs;
 
