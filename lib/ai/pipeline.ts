@@ -9,6 +9,10 @@ export function buildFacts(payload: Payload): Facts {
     .map((f) => f.trim())
     .filter(Boolean)
     .slice(0, 10);
+  const photos = (payload.photos || [])
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .slice(0, 10);
   const raw = {
     address: payload.address?.trim(),
     neighborhood: payload.neighborhood?.trim(),
@@ -16,6 +20,7 @@ export function buildFacts(payload: Payload): Facts {
     baths: payload.baths?.trim(),
     sqft: payload.sqft?.trim(),
     features,
+    photos,
     propertyType: payload.propertyType?.trim(),
     tone: payload.tone?.trim(),
     brandVoice: payload.brandVoice?.trim(),
