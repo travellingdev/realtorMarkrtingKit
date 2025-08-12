@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer, supabaseAdmin } from '@/lib/supabaseClients';
 import { generateOutputs, PayloadSchema } from '@/lib/generator';
-import { generateOutputsWithAI } from '@/lib/ai';
+import { buildFacts, generateKit } from '@/lib/ai/pipeline';
+import { ControlsSchema } from '@/lib/ai/schemas';
 
 export async function POST(req: Request) {
   const startedAt = Date.now();
@@ -12,16 +13,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'auth' }, { status: 401 });
   }
   console.log('[api/generate] begin', { userId: user.id });
-  const body = await req.json().catch(() => ({}));
-  const parse = PayloadSchema.safeParse(body);
-  if (!parse.success) {
-    console.warn('[api/generate] bad_request', { userId: user.id, issues: parse.error.issues?.slice?.(0, 3) });
-    return NextResponse.json({ error: 'bad_request', details: parse.error.flatten() }, { status: 400 });
+  const { payload, controls: rawControls = {} } = await req.json().catch(() => ({ }));
+  const payloadParse = PayloadSchema.safeParse(payload);
+  if (!payloadParse.success) {
+    console.warn('[api/generate] bad_request', { userId: user.id, issues: payloadParse.error.issues?.slice?.(0, 3) });
+    return NextResponse.json({ error: 'bad_request', details: payloadParse.error.flatten() }, { status: 400 });
   }
-  const payload = parse.data;
+  const controlsParse = ControlsSchema.safeParse(rawControls);
+  if (!controlsParse.success) {
+    console.warn('[api/generate] bad_request', { userId: user.id, issues: controlsParse.error.issues?.slice?.(0, 3) });
+    return NextResponse.json({ error: 'bad_request', details: controlsParse.error.flatten() }, { status: 400 });
+  }
+  const payloadData = payloadParse.data;
+  const controlsData = controlsParse.data;
   const { data: kit, error } = await sb
     .from('kits')
-    .insert({ user_id: user.id, payload, status: 'PROCESSING' })
+    .insert({ user_id: user.id, payload: payloadData, status: 'PROCESSING' })
     .select('*')
     .single();
   if (error) {
@@ -30,13 +37,13 @@ export async function POST(req: Request) {
   }
   console.log('[api/generate] kit row created', { userId: user.id, kitId: kit.id });
 
-  async function updateKitReady(outputs: any) {
-    const { error: updErr } = await sb.from('kits').update({ status: 'READY', outputs }).eq('id', kit.id);
+  async function updateKitReady(fields: any) {
+    const { error: updErr } = await sb.from('kits').update({ status: 'READY', ...fields }).eq('id', kit.id);
     if (!updErr) return true;
     console.error('[api/generate] update via user client failed', { kitId: kit.id, updErr });
     try {
       const admin = supabaseAdmin();
-      const { error: adminErr } = await admin.from('kits').update({ status: 'READY', outputs }).eq('id', kit.id);
+      const { error: adminErr } = await admin.from('kits').update({ status: 'READY', ...fields }).eq('id', kit.id);
       if (adminErr) {
         console.error('[api/generate] update via admin client failed', { kitId: kit.id, adminErr });
         return false;
@@ -49,17 +56,20 @@ export async function POST(req: Request) {
     }
   }
 
+  const facts = buildFacts(payloadData);
+
   // Try AI first; fallback to local deterministic generator on failure
   try {
-    const plan = 'FREE' as 'FREE' | 'PRO' | 'TEAM';
-    const outputsAI = await generateOutputsWithAI(payload, plan);
-    await updateKitReady(outputsAI);
-    console.log('[api/generate] AI generation success', { userId: user.id, kitId: kit.id, ms: Date.now() - startedAt });
+    const { outputs, flags, promptVersion } = await generateKit({ facts, controls: controlsData });
+    const latencyMs = Date.now() - startedAt;
+    await updateKitReady({ outputs, flags, latency_ms: latencyMs, prompt_version: promptVersion });
+    console.log('[api/generate] AI generation success', { userId: user.id, kitId: kit.id, ms: latencyMs });
   } catch (e: any) {
     console.error('[api/generate] AI generation failed, falling back', { userId: user.id, kitId: kit.id, error: String(e?.message || e) });
-    const outputsLocal = generateOutputs(payload);
-    await updateKitReady(outputsLocal);
-    console.log('[api/generate] local generation success', { userId: user.id, kitId: kit.id, ms: Date.now() - startedAt });
+    const outputsLocal = generateOutputs(payloadData);
+    const latencyMs = Date.now() - startedAt;
+    await updateKitReady({ outputs: outputsLocal, flags: [], latency_ms: latencyMs, prompt_version: null });
+    console.log('[api/generate] local generation success', { userId: user.id, kitId: kit.id, ms: latencyMs });
   }
 
   console.log('[api/generate] done', { userId: user.id, ms: Date.now() - startedAt });
