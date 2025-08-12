@@ -23,7 +23,7 @@ export function buildFacts(payload: Payload): Facts {
   return FactsSchema.parse(raw);
 }
 
-function composeDraftMessages(facts: Facts): ChatMessage[] {
+function composeDraftMessages(facts: Facts, controls: Controls): ChatMessage[] {
   return [
     {
       role: 'system',
@@ -32,7 +32,7 @@ function composeDraftMessages(facts: Facts): ChatMessage[] {
     },
     {
       role: 'user',
-      content: `Facts: ${JSON.stringify(facts)}`,
+      content: `Facts: ${JSON.stringify(facts)}\nControls: ${JSON.stringify(controls)}`,
     },
   ];
 }
@@ -133,7 +133,10 @@ export async function generateKit({
   const plan = controls.plan;
   const policy = controls.policy;
   let tokenCounts: TokenCounts = { prompt: 0, completion: 0, total: 0 };
-  const draftRes = await callProvider(composeDraftMessages(facts), plan);
+  const draftRes = await callProvider(
+    composeDraftMessages(facts, controls),
+    plan
+  );
   tokenCounts.prompt += draftRes.tokenCounts.prompt;
   tokenCounts.completion += draftRes.tokenCounts.completion;
   tokenCounts.total += draftRes.tokenCounts.total;

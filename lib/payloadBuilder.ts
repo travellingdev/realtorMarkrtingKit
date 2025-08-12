@@ -1,4 +1,5 @@
 import type { Payload } from '@/lib/generator';
+import type { Controls } from '@/lib/ai/schemas';
 
 export function buildPayloadFromForm({
   address,
@@ -52,7 +53,7 @@ export function buildPayloadFromForm({
   mlsFormat: string;
   mustInclude: string;
   avoidWords: string;
-}): { payload: Payload; controls: any } {
+}): { payload: Payload; controls: Partial<Controls> } {
   const toStr = (v: string) => (v?.trim() ? v.trim() : undefined);
   const featureList = features
     .split(',')
@@ -70,7 +71,7 @@ export function buildPayloadFromForm({
     propertyType: toStr(propertyType),
     brandVoice: toStr(brandVoice),
   };
-  const controls = {
+  const controls: Partial<Controls> = {
     channels: channels && channels.length ? channels : undefined,
     openHouseDate: toStr(openHouseDate),
     openHouseTime: toStr(openHouseTime),

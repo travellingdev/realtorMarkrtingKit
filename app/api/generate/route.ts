@@ -108,7 +108,7 @@ export async function POST(req: Request) {
     console.log('[api/generate] AI generation success', { userId: user.id, kitId: kit.id, ms: latencyMs });
   } catch (e: any) {
     console.error('[api/generate] AI generation failed, falling back', { userId: user.id, kitId: kit.id, error: String(e?.message || e) });
-    const outputsLocal = generateOutputs(payloadData);
+    const outputsLocal = generateOutputs(payloadData, controlsData);
     const latencyMs = Date.now() - startedAt;
     await updateKitReady({
       outputs: outputsLocal,
