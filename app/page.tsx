@@ -52,10 +52,13 @@ export default function RealtorsAIMarketingKit() {
     isGenerating,
     freeKitsUsed,
     freeLimit,
+    photoInsights,
     showAuth, setShowAuth,
+    copyToast, setCopyToast,
     onGenerate,
     useSample,
     handleReveal,
+    generateHeroImages,
     refresh,
   } = useRealtorKit();
 
@@ -115,6 +118,15 @@ export default function RealtorsAIMarketingKit() {
   return (
     <div ref={topRef} className="min-h-screen bg-neutral-950 text-white">
       <GradientDecoration />
+      
+      {/* Copy Toast Notification */}
+      {copyToast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="rounded-2xl bg-white text-neutral-900 px-4 py-2 shadow-lg">
+            {copyToast}
+          </div>
+        </div>
+      )}
 
       <header className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-neutral-900/60 bg-neutral-900/80 border-b border-white/10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -204,12 +216,39 @@ export default function RealtorsAIMarketingKit() {
         outputs={outputs}
         revealed={revealed}
         canCopyAll={canCopyAll()}
-        onCopyAll={() => { /* Not implemented in hook yet */ }}
+        onCopyAll={() => {
+          if (!outputs) return;
+          const allContent = [
+            '=== MLS DESCRIPTION ===',
+            outputs.mlsDesc,
+            '',
+            '=== INSTAGRAM CAROUSEL ===',
+            outputs.igSlides.join('\n'),
+            '',
+            '=== REEL SCRIPT ===',
+            outputs.reelScript.join('\n'),
+            '',
+            '=== EMAIL ===',
+            `Subject: ${outputs.emailSubject}`,
+            '',
+            outputs.emailBody
+          ].join('\n');
+          navigator.clipboard.writeText(allContent);
+          setCopyToast('All assets copied!');
+          setTimeout(() => setCopyToast(''), 2000);
+        }}
         onRequestAuth={() => setShowAuth(true)}
         handleReveal={handleReveal}
         kitSample={kitSample}
         isLoggedIn={isLoggedIn}
         kitStatus={kitStatus}
+        onCopySuccess={(message) => {
+          setCopyToast(message);
+          setTimeout(() => setCopyToast(''), 2000);
+        }}
+        onRetry={onGenerate}
+        photoInsights={photoInsights}
+        onGenerateHero={generateHeroImages}
       />
 
       <Pricing />

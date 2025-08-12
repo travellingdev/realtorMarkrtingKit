@@ -2,6 +2,7 @@ import type { Payload } from '@/lib/generator';
 import type { Output, Facts, Controls } from './schemas';
 import { FactsSchema, OutputSchema } from './schemas';
 import { callProvider, ChatMessage, TokenCounts } from './provider';
+import { analyzePhotosWithVision, enhanceContentWithInsights, type PhotoInsights } from './photoAnalysis';
 
 // Normalize and sanitize incoming payload values.
 export function buildFacts(payload: Payload): Facts {
@@ -28,26 +29,93 @@ export function buildFacts(payload: Payload): Facts {
   return FactsSchema.parse(raw);
 }
 
-function composeDraftMessages(facts: Facts, controls: Controls): ChatMessage[] {
+function composeDraftMessages(facts: Facts, controls: Controls, photoInsights?: PhotoInsights): ChatMessage[] {
+  // Build comprehensive instructions including all controls
+  const channelInstructions = controls.channels?.length 
+    ? `Generate ONLY these outputs: ${controls.channels.join(', ')}. Set other outputs to empty.`
+    : 'Generate all outputs (mlsDesc, igSlides, reelScript, emailSubject, emailBody).';
+  
+  const openHouseInfo = [
+    controls.openHouseDate,
+    controls.openHouseTime,
+    controls.openHouseLink
+  ].filter(Boolean).join(' ');
+  
+  const ctaInstruction = controls.ctaType === 'phone' && controls.ctaPhone
+    ? `Add call-to-action: Call ${controls.ctaPhone}`
+    : controls.ctaType === 'link' && controls.ctaLink
+    ? `Add call-to-action: Visit ${controls.ctaLink}`
+    : controls.ctaType === 'custom' && controls.ctaCustom
+    ? `Add call-to-action: ${controls.ctaCustom}`
+    : '';
+
+  // Build photo insights section
+  const photoContext = photoInsights ? [
+    'PHOTO ANALYSIS INSIGHTS:',
+    `Rooms identified: ${photoInsights.rooms.map(r => `${r.type} (${r.features.join(', ')})`).join('; ')}`,
+    `Key features visible: ${photoInsights.features.join(', ')}`,
+    `Property style: ${photoInsights.style.join(', ')}`,
+    `Condition: ${photoInsights.condition}`,
+    `Selling points: ${photoInsights.sellingPoints.join(', ')}`,
+    `Marketing angles: ${photoInsights.marketingAngles.join(', ')}`,
+    '',
+    'IMPORTANT: Incorporate these visual insights naturally into your copy. Mention specific features you can see in the photos.'
+  ].join('\n') : '';
+
+  const systemPrompt = [
+    'You are a real-estate copywriter. Produce MLS-compliant, fair-housing-safe content.',
+    'Output JSON only matching the schema exactly.',
+    'Rules:',
+    '- No protected classes, school quality, crime, or demographics',
+    '- Respect channel selection - only generate requested outputs', 
+    '- Include all provided information (open house, CTAs, social handles)',
+    '- Apply tone, format preferences, and policy requirements',
+    '- If photo insights are provided, use them to create compelling, specific copy'
+  ].join('\n');
+
+  const userPrompt = [
+    `Property Facts: ${JSON.stringify(facts)}`,
+    '',
+    photoContext,
+    photoContext ? '' : 'No photos provided - use property facts only.',
+    '',
+    'Generation Controls:',
+    channelInstructions,
+    openHouseInfo ? `Open House: ${openHouseInfo}` : '',
+    ctaInstruction,
+    controls.socialHandle ? `Social: ${controls.socialHandle}` : '',
+    controls.hashtagStrategy ? `Hashtags: ${controls.hashtagStrategy}` : '',
+    controls.extraHashtags ? `Extra tags: ${controls.extraHashtags}` : '',
+    controls.readingLevel ? `Reading level: ${controls.readingLevel}` : '',
+    controls.useEmojis ? 'Include appropriate emojis' : 'No emojis',
+    controls.mlsFormat ? `MLS format: ${controls.mlsFormat}` : '',
+    controls.policy?.mustInclude?.length ? `Must include words: ${controls.policy.mustInclude.join(', ')}` : '',
+    controls.policy?.avoidWords?.length ? `Avoid words: ${controls.policy.avoidWords.join(', ')}` : '',
+    '',
+    'JSON Output Schema:',
+    '{',
+    '  "mlsDesc": string  // MLS description, respect format preference',
+    '  "igSlides": string[]  // Instagram carousel slides',  
+    '  "reelScript": string[]  // 3-part reel script',
+    '  "emailSubject": string  // Email subject line',
+    '  "emailBody": string  // Email body with CTA if provided',
+    '}',
+    'Set any non-requested channel outputs to empty string/array.'
+  ].filter(Boolean).join('\n');
+
   return [
-    {
-      role: 'system',
-      content:
-        'You are a real-estate copywriter. Produce MLS-compliant, fair-housing-safe content. Output JSON only matching the schema exactly.',
-    },
-    {
-      role: 'user',
-      content: `Facts: ${JSON.stringify(facts)}\nControls: ${JSON.stringify(controls)}`,
-    },
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt }
   ];
 }
 
 function composeCritiqueMessages(
   facts: Facts,
   draft: Output,
-  policy: Controls['policy'],
+  controls: Controls,
   violations?: { missing: string[]; banned: string[] }
 ): ChatMessage[] {
+  const policy = controls.policy;
   let policyText = '';
   if (policy?.mustInclude.length || policy?.avoidWords.length) {
     policyText = `\nPolicy: must include [${policy.mustInclude.join(', ')}]; avoid words [${policy.avoidWords.join(', ')}]`;
@@ -56,15 +124,26 @@ function composeCritiqueMessages(
   if (violations && (violations.missing.length || violations.banned.length)) {
     violationText = `\nViolations: missing [${violations.missing.join(', ')}]; banned [${violations.banned.join(', ')}]`;
   }
+  
+  // Include all control instructions for critique
+  const controlsText = [
+    controls.channels?.length ? `Channels: Only ${controls.channels.join(', ')} should have content` : '',
+    controls.openHouseDate || controls.openHouseTime ? `Include open house info` : '',
+    controls.ctaType ? `Include CTA in outputs` : '',
+    controls.socialHandle ? `Include social handle in Instagram` : '',
+    controls.useEmojis ? 'Should include emojis' : 'No emojis',
+    controls.mlsFormat === 'bullets' ? 'MLS should use bullet format' : ''
+  ].filter(Boolean).join('; ');
+  
   return [
     {
       role: 'system',
       content:
-        'You are a real-estate copywriter and critical editor. Ensure outputs comply with MLS and fair-housing rules. Output final JSON only.',
+        'You are a real-estate copywriter and critical editor. Ensure outputs comply with MLS and fair-housing rules. Verify all controls are applied. Output final JSON only.',
     },
     {
       role: 'user',
-      content: `Facts: ${JSON.stringify(facts)}\nDraft: ${JSON.stringify(draft)}${policyText}${violationText}`,
+      content: `Facts: ${JSON.stringify(facts)}\nDraft: ${JSON.stringify(draft)}${policyText}${violationText}\nControls to verify: ${controlsText}`,
     },
   ];
 }
@@ -134,12 +213,30 @@ export async function generateKit({
   promptVersion: string;
   rulesVersion: string;
   tokenCounts: TokenCounts;
+  photoInsights?: PhotoInsights;
 }> {
   const plan = controls.plan;
   const policy = controls.policy;
   let tokenCounts: TokenCounts = { prompt: 0, completion: 0, total: 0 };
+  
+  // Analyze photos if provided
+  let photoInsights: PhotoInsights | undefined;
+  if (facts.photos && facts.photos.length > 0) {
+    try {
+      console.log('[pipeline] Analyzing photos...', { count: facts.photos.length });
+      photoInsights = await analyzePhotosWithVision(facts.photos);
+      console.log('[pipeline] Photo analysis complete', { 
+        rooms: photoInsights.rooms.length,
+        features: photoInsights.features.length 
+      });
+    } catch (error) {
+      console.warn('[pipeline] Photo analysis failed', error);
+      // Continue without photo insights
+    }
+  }
+  
   const draftRes = await callProvider(
-    composeDraftMessages(facts, controls),
+    composeDraftMessages(facts, controls, photoInsights),
     plan
   );
   tokenCounts.prompt += draftRes.tokenCounts.prompt;
@@ -148,7 +245,7 @@ export async function generateKit({
   let critique = draftRes.output;
   try {
     const critRes = await callProvider(
-      composeCritiqueMessages(facts, critique, policy),
+      composeCritiqueMessages(facts, critique, controls),
       plan
     );
     tokenCounts.prompt += critRes.tokenCounts.prompt;
@@ -159,7 +256,7 @@ export async function generateKit({
     if (pv.missing.length || pv.banned.length) {
       try {
         const retryRes = await callProvider(
-          composeCritiqueMessages(facts, parsed, policy, pv),
+          composeCritiqueMessages(facts, parsed, controls, pv),
           plan
         );
         tokenCounts.prompt += retryRes.tokenCounts.prompt;
@@ -176,7 +273,7 @@ export async function generateKit({
     if (pv.missing.length || pv.banned.length) {
       try {
         const postRes = await callProvider(
-          composeCritiqueMessages(facts, outputs, policy, pv),
+          composeCritiqueMessages(facts, outputs, controls, pv),
           plan
         );
         tokenCounts.prompt += postRes.tokenCounts.prompt;
@@ -194,6 +291,7 @@ export async function generateKit({
       promptVersion: PROMPT_VERSION,
       rulesVersion: RULES_VERSION,
       tokenCounts,
+      photoInsights,
     };
   } catch (err) {
     console.warn('[pipeline] critique pass failed', err);
@@ -205,6 +303,7 @@ export async function generateKit({
       promptVersion: PROMPT_VERSION,
       rulesVersion: RULES_VERSION,
       tokenCounts,
+      photoInsights,
     };
   }
 }

@@ -60,6 +60,7 @@ type InstantDemoFormProps = {
   onGenerate: () => void;
   onUseSample: () => void;
   isGenerating?: boolean;
+  generationStage?: 'uploading' | 'analyzing' | 'selecting' | 'generating' | 'complete';
 };
 
 function LabeledInput({ label, value, onChange, type = "text", placeholder }:{label:string; value:string; onChange:(v:string)=>void; type?:string; placeholder?:string;}){
@@ -100,6 +101,23 @@ function ChipGroup({ label, options, value, onChange }:{label:string; options:re
       </div>
     </div>
   );
+}
+
+function getGenerationMessage(stage?: 'uploading' | 'analyzing' | 'selecting' | 'generating' | 'complete'): string {
+  switch (stage) {
+    case 'uploading':
+      return 'Uploading photos...';
+    case 'analyzing':
+      return 'Reading your photos...';
+    case 'selecting':
+      return 'Choosing best marketing photo...';
+    case 'generating':
+      return 'Creating your marketing kit...';
+    case 'complete':
+      return 'Finalizing...';
+    default:
+      return 'Generating...';
+  }
 }
 
 export default function InstantDemoForm(props: InstantDemoFormProps){
@@ -146,21 +164,48 @@ export default function InstantDemoForm(props: InstantDemoFormProps){
         <LabeledInput label="Key features (comma-separated)" value={features} onChange={setFeatures} placeholder="Chef's kitchen, Wide-plank floors, EV garage" />
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <label className="inline-flex items-center gap-2 text-sm text-white/80">
-          <ImageIcon className="h-4 w-4" /> Photos (optional):
-          <input
-            aria-label="Upload photos"
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={(e) => props.setPhotos(Array.from(e.target.files || []))}
-            className="block text-xs file:mr-3 file:rounded-xl file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-neutral-900 hover:file:opacity-90"
-          />
+      <div className="mt-4">
+        <label className="block">
+          <div className="text-sm text-white/80 mb-2">
+            <ImageIcon className="h-4 w-4 inline mr-2" />
+            Photos (for enhanced AI analysis)
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-neutral-950/50 p-4">
+            <input
+              aria-label="Upload photos"
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={(e) => props.setPhotos(Array.from(e.target.files || []))}
+              className="block w-full text-sm file:mr-3 file:rounded-xl file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-neutral-900 hover:file:opacity-90"
+            />
+            {photos?.length ? (
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center gap-2 text-sm text-white/80">
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-500/20 text-green-400 text-xs">
+                    ✓
+                  </span>
+                  {photos.length} photo{photos.length > 1 ? 's' : ''} ready for AI analysis
+                </div>
+                <div className="text-xs text-white/60">
+                  AI will analyze your photos to create enhanced descriptions that highlight your property&apos;s best features
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 text-xs text-white/60">
+                <div className="mb-1">💡 Pro tip: Include these photos for best AI results:</div>
+                <div className="grid grid-cols-2 gap-1 text-white/50">
+                  <span>• Front exterior</span>
+                  <span>• Kitchen</span>
+                  <span>• Living room</span>
+                  <span>• Master bedroom</span>
+                  <span>• Best feature (pool, view, etc.)</span>
+                  <span>• Any unique selling points</span>
+                </div>
+              </div>
+            )}
+          </div>
         </label>
-        {photos?.length ? (
-          <span className="text-xs text-white/60">{photos.length} selected</span>
-        ) : null}
       </div>
 
       <div className="mt-6 grid md:grid-cols-2 gap-6">
@@ -289,9 +334,14 @@ export default function InstantDemoForm(props: InstantDemoFormProps){
             "inline-flex items-center gap-2 rounded-2xl bg-white text-neutral-900 px-5 py-3 font-semibold hover:opacity-90"
           )
         }>
-          {isGenerating ? 'Generating…' : 'Generate from these details'}
+          {isGenerating ? (
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-4 border-2 border-neutral-900/30 border-t-neutral-900 rounded-full animate-spin"></div>
+              {getGenerationMessage(props.generationStage)}
+            </div>
+          ) : 'Generate from these details'}
         </button>
-        <button onClick={onUseSample} className="text-white/80 hover:text-white underline underline-offset-4">
+        <button onClick={onUseSample} disabled={isGenerating} className="text-white/80 hover:text-white underline underline-offset-4 disabled:opacity-50">
           Use a sample listing instead
         </button>
       </div>

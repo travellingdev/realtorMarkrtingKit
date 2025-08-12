@@ -92,19 +92,32 @@ export async function POST(req: Request) {
     return NextResponse.json({ kitId: kit.id });
   }
 
-  // Try AI first; fallback to local deterministic generator on failure
+  // Try AI with photo analysis first; fallback to local deterministic generator on failure
   try {
-    const { outputs, flags, promptVersion, tokenCounts } = await generateKit({ facts, controls: controlsData });
+    const { outputs, flags, promptVersion, tokenCounts, photoInsights } = await generateKit({ facts, controls: controlsData });
     const latencyMs = Date.now() - startedAt;
     const qualityScore = Math.max(0, 100 - flags.length * 10);
-    await updateKitReady({
+    
+    // Store photo insights for potential hero image generation
+    const kitData: any = {
       outputs,
       flags,
       latency_ms: latencyMs,
       token_counts: tokenCounts,
       quality_score: qualityScore,
       prompt_version: promptVersion,
-    });
+    };
+    
+    if (photoInsights) {
+      kitData.photo_insights = photoInsights;
+      console.log('[api/generate] Photo analysis included', { 
+        rooms: photoInsights.rooms.length,
+        features: photoInsights.features.length,
+        heroCandidate: photoInsights.heroCandidate?.index
+      });
+    }
+    
+    await updateKitReady(kitData);
     console.log('[api/generate] AI generation success', { userId: user.id, kitId: kit.id, ms: latencyMs });
   } catch (e: any) {
     console.error('[api/generate] AI generation failed, falling back', { userId: user.id, kitId: kit.id, error: String(e?.message || e) });

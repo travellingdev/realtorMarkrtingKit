@@ -68,6 +68,7 @@ export function useRealtorKit() {
   const [kitId, setKitId] = useState(0);
   const [kitSample, setKitSample] = useState(false);
   const [kitConsumed, setKitConsumed] = useState(false);
+  const [photoInsights, setPhotoInsights] = useState<any>(null);
 
   // Helpers
   const toFeatureList = useMemo(() => features.split(",").map((f) => f.trim()).filter(Boolean), [features]);
@@ -80,17 +81,29 @@ export function useRealtorKit() {
       return;
     }
     if (isGenerating) return;
+    
+    // Clear previous outputs before starting new generation
+    setServerOutputs(null);
+    setKitStatus('PROCESSING');
+    setGenerated(false);
+    setRevealed(false);
+    setKitConsumed(false);
+    
     setIsGenerating(true);
     try {
       console.log('[useRealtorKit] onGenerate begin');
       let photoUrls: string[] = [];
       try {
         if (photos.length) {
+          setCopyToast(`Uploading ${photos.length} photo${photos.length > 1 ? 's' : ''}...`);
           const sb = supabaseBrowser();
           photoUrls = await uploadPhotos(sb, photos, user.id);
+          setCopyToast('');
         }
       } catch (err) {
         console.warn('[useRealtorKit] photo upload failed', err);
+        setCopyToast('Photo upload failed, continuing without photos');
+        setTimeout(() => setCopyToast(''), 3000);
       }
       const { payload, controls } = buildPayloadFromForm({
         address,
@@ -155,6 +168,7 @@ export function useRealtorKit() {
               const j = await r.json();
               if (j?.status === 'READY' && j.outputs) {
                 setServerOutputs(j.outputs);
+                setPhotoInsights(j.photo_insights);
                 setKitStatus('READY');
                 console.log('[useRealtorKit] kit ready', { ms: Date.now() - start });
                 return;
@@ -181,8 +195,11 @@ export function useRealtorKit() {
         };
         poll();
       }
-      const el = document.getElementById('outputs');
-      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Only scroll to outputs after generation starts
+      setTimeout(() => {
+        const el = document.getElementById('outputs');
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     } catch (err) {
       console.warn('[useRealtorKit] onGenerate error', err);
       setCopyToast('Unexpected error. Please try again.');
@@ -288,6 +305,42 @@ export function useRealtorKit() {
     return { mlsDesc: styledDesc, igSlides, reelScript, emailSubject, emailBody };
   }, [generated, address, beds, baths, sqft, toFeatureList, brandVoice, nearby]);
 
+  const generateHeroImages = async () => {
+    if (!kitId || kitSample) return;
+    
+    try {
+      setCopyToast('Generating hero images...');
+      
+      const response = await fetch('/api/hero', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kitId,
+          options: {
+            overlay: 'just_listed',
+            price: '$650,000', // You can make this dynamic
+            bedsBaths: `${beds}BD | ${baths}BA`,
+            style: 'modern'
+          }
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        setCopyToast('Hero images generated! Check downloads below.');
+        setTimeout(() => setCopyToast(''), 3000);
+        console.log('Hero images generated:', result);
+      } else {
+        setCopyToast('Failed to generate hero images');
+        setTimeout(() => setCopyToast(''), 2000);
+      }
+    } catch (error) {
+      console.error('Hero generation error:', error);
+      setCopyToast('Error generating hero images');
+      setTimeout(() => setCopyToast(''), 2000);
+    }
+  };
+
   const outputs = kitSample ? sampleOutputs : serverOutputs;
 
   return {
@@ -328,12 +381,14 @@ export function useRealtorKit() {
     freeKitsUsed,
     freeLimit,
     outputs,
+    photoInsights,
     showAuth, setShowAuth,
 
     // Functions
     onGenerate,
     useSample,
     handleReveal,
+    generateHeroImages,
     refresh,
   };
 }

@@ -7,8 +7,8 @@ type OpenAIChatResponse = {
   }>;
 };
 
-const MODEL_FREE = process.env.OPENAI_MODEL_FREE || 'gpt-5-2025-08-07';
-const MODEL_PRO = process.env.OPENAI_MODEL_PRO || 'gpt-5-2025-08-07';
+const MODEL_FREE = process.env.OPENAI_MODEL_FREE || 'gpt-4o-mini';
+const MODEL_PRO = process.env.OPENAI_MODEL_PRO || 'gpt-5';
 
 function buildPrompt(payload: Payload): string {
   const safe = (v?: string) => (v ? v : '');

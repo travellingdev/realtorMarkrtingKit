@@ -5,8 +5,8 @@ export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: stri
 
 export type TokenCounts = { prompt: number; completion: number; total: number };
 
-const MODEL_FREE = process.env.OPENAI_MODEL_FREE || 'gpt-5-2025-08-07';
-const MODEL_PRO = process.env.OPENAI_MODEL_PRO || 'gpt-5-2025-08-07';
+const MODEL_FREE = process.env.OPENAI_MODEL_FREE || 'gpt-4o-mini';
+const MODEL_PRO = process.env.OPENAI_MODEL_PRO || 'gpt-5';
 
 async function request(
   messages: ChatMessage[],
@@ -63,7 +63,8 @@ export async function callProvider(
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY not set');
   const model = plan === 'FREE' ? MODEL_FREE : MODEL_PRO;
-  const timeoutMs = options?.timeoutMs ?? 15000;
+  const envTimeout = Number(process.env.OPENAI_TIMEOUT_MS || 15000);
+  const timeoutMs = options?.timeoutMs ?? envTimeout;
 
   let lastErr: any;
   for (let attempt = 0; attempt < 2; attempt++) {
