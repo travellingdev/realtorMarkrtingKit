@@ -1,5 +1,5 @@
 import type { Payload } from '@/lib/generator';
-import type { Output, Facts } from './schemas';
+import type { Output, Facts, Controls } from './schemas';
 import { FactsSchema, OutputSchema } from './schemas';
 import { callProvider, ChatMessage } from './provider';
 
@@ -82,11 +82,14 @@ function complianceScan(o: Output): string[] {
 const PROMPT_VERSION = '1';
 const RULES_VERSION = '1';
 
-export async function generateKit(
-  payload: Payload,
-  plan: 'FREE' | 'PRO' | 'TEAM' = 'FREE'
-): Promise<{ outputs: Output; flags: string[]; promptVersion: string; rulesVersion: string }> {
-  const facts = buildFacts(payload);
+export async function generateKit({
+  facts,
+  controls,
+}: {
+  facts: Facts;
+  controls: Controls;
+}): Promise<{ outputs: Output; flags: string[]; promptVersion: string; rulesVersion: string }> {
+  const plan = controls.plan;
   const draft = await callProvider(composeDraftMessages(facts), plan);
   let final = draft;
   try {
