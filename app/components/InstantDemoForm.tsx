@@ -265,6 +265,7 @@ export default function InstantDemoForm(props: InstantDemoFormProps){
             value={mustInclude}
             onChange={(e) => setMustInclude(e.target.value)}
             rows={3}
+            placeholder="e.g., pool, views"
             className="mt-2 w-full rounded-2xl bg-neutral-950 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-cyan-400/60"
           />
         </label>
@@ -274,6 +275,7 @@ export default function InstantDemoForm(props: InstantDemoFormProps){
             value={avoidWords}
             onChange={(e) => setAvoidWords(e.target.value)}
             rows={3}
+            placeholder="e.g., fixer-upper, noisy"
             className="mt-2 w-full rounded-2xl bg-neutral-950 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-cyan-400/60"
           />
         </label>

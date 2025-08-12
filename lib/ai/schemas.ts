@@ -18,6 +18,12 @@ export type Facts = z.infer<typeof FactsSchema>;
 // room for future knobs.
 export const ControlsSchema = z.object({
   plan: z.enum(['FREE', 'PRO', 'TEAM']).default('FREE'),
+  policy: z
+    .object({
+      mustInclude: z.array(z.string()).default([]),
+      avoidWords: z.array(z.string()).default([]),
+    })
+    .default({ mustInclude: [], avoidWords: [] }),
 });
 export type Controls = z.infer<typeof ControlsSchema>;
 

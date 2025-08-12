@@ -85,8 +85,16 @@ export function buildPayloadFromForm({
     readingLevel: toStr(readingLevel),
     useEmojis: useEmojis ? true : undefined,
     mlsFormat: toStr(mlsFormat),
-    mustInclude: toStr(mustInclude),
-    avoidWords: toStr(avoidWords),
+    policy: {
+      mustInclude: mustInclude
+        .split(',')
+        .map((w) => w.trim())
+        .filter(Boolean),
+      avoidWords: avoidWords
+        .split(',')
+        .map((w) => w.trim())
+        .filter(Boolean),
+    },
   };
   return { payload, controls };
 }

@@ -37,7 +37,20 @@ function composeDraftMessages(facts: Facts): ChatMessage[] {
   ];
 }
 
-function composeCritiqueMessages(facts: Facts, draft: Output): ChatMessage[] {
+function composeCritiqueMessages(
+  facts: Facts,
+  draft: Output,
+  policy: Controls['policy'],
+  violations?: { missing: string[]; banned: string[] }
+): ChatMessage[] {
+  let policyText = '';
+  if (policy?.mustInclude.length || policy?.avoidWords.length) {
+    policyText = `\nPolicy: must include [${policy.mustInclude.join(', ')}]; avoid words [${policy.avoidWords.join(', ')}]`;
+  }
+  let violationText = '';
+  if (violations && (violations.missing.length || violations.banned.length)) {
+    violationText = `\nViolations: missing [${violations.missing.join(', ')}]; banned [${violations.banned.join(', ')}]`;
+  }
   return [
     {
       role: 'system',
@@ -46,7 +59,7 @@ function composeCritiqueMessages(facts: Facts, draft: Output): ChatMessage[] {
     },
     {
       role: 'user',
-      content: `Facts: ${JSON.stringify(facts)}\nDraft: ${JSON.stringify(draft)}`,
+      content: `Facts: ${JSON.stringify(facts)}\nDraft: ${JSON.stringify(draft)}${policyText}${violationText}`,
     },
   ];
 }
@@ -79,6 +92,28 @@ function complianceScan(o: Output): string[] {
   return banned.filter((b) => text.includes(b));
 }
 
+function policyViolations(o: Output, policy: Controls['policy']): {
+  missing: string[];
+  banned: string[];
+} {
+  const text = [
+    o.mlsDesc,
+    ...o.igSlides,
+    ...o.reelScript,
+    o.emailSubject,
+    o.emailBody,
+  ]
+    .join(' ')
+    .toLowerCase();
+  const missing = (policy?.mustInclude || []).filter(
+    (w) => !text.includes(w.toLowerCase())
+  );
+  const banned = (policy?.avoidWords || []).filter((w) =>
+    text.includes(w.toLowerCase())
+  );
+  return { missing, banned };
+}
+
 const PROMPT_VERSION = '1';
 const RULES_VERSION = '1';
 
@@ -90,15 +125,47 @@ export async function generateKit({
   controls: Controls;
 }): Promise<{ outputs: Output; flags: string[]; promptVersion: string; rulesVersion: string }> {
   const plan = controls.plan;
+  const policy = controls.policy;
   const draft = await callProvider(composeDraftMessages(facts), plan);
-  let final = draft;
+  let critique = draft;
   try {
-    final = await callProvider(composeCritiqueMessages(facts, draft), plan);
+    critique = await callProvider(
+      composeCritiqueMessages(facts, draft, policy),
+      plan
+    );
+    let parsed = OutputSchema.parse(critique);
+    let pv = policyViolations(parsed, policy);
+    if (pv.missing.length || pv.banned.length) {
+      try {
+        critique = await callProvider(
+          composeCritiqueMessages(facts, parsed, policy, pv),
+          plan
+        );
+        parsed = OutputSchema.parse(critique);
+      } catch (err) {
+        console.warn('[pipeline] re-critique pass failed', err);
+      }
+    }
+    let outputs = postProcess(parsed);
+    pv = policyViolations(outputs, policy);
+    if (pv.missing.length || pv.banned.length) {
+      try {
+        critique = await callProvider(
+          composeCritiqueMessages(facts, outputs, policy, pv),
+          plan
+        );
+        outputs = postProcess(OutputSchema.parse(critique));
+      } catch (err) {
+        console.warn('[pipeline] post-process critique pass failed', err);
+      }
+    }
+    const flags = complianceScan(outputs);
+    return { outputs, flags, promptVersion: PROMPT_VERSION, rulesVersion: RULES_VERSION };
   } catch (err) {
     console.warn('[pipeline] critique pass failed', err);
+    const outputs = postProcess(OutputSchema.parse(critique));
+    const flags = complianceScan(outputs);
+    return { outputs, flags, promptVersion: PROMPT_VERSION, rulesVersion: RULES_VERSION };
   }
-  const outputs = postProcess(OutputSchema.parse(final));
-  const flags = complianceScan(outputs);
-  return { outputs, flags, promptVersion: PROMPT_VERSION, rulesVersion: RULES_VERSION };
 }
 
