@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import { useUser } from '@/app/providers/UserProvider';
 import { openCheckout } from '@/lib/billing';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
@@ -65,7 +66,13 @@ export default function UserMenu() {
         className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white text-neutral-900 text-sm font-bold"
       >
         {user.avatar_url ? (
-          <img src={user.avatar_url} alt="User avatar" className="h-full w-full object-cover" />
+          <Image
+            src={user.avatar_url}
+            alt="User avatar"
+            width={32}
+            height={32}
+            className="h-full w-full object-cover"
+          />
         ) : (
           (user.email || 'U').slice(0, 1).toUpperCase()
         )}

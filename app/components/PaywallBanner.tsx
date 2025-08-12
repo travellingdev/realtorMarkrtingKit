@@ -21,7 +21,7 @@ export default function PaywallBanner({ show, extraUnlocked, onUnlockOneMore, on
         >
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <div className="text-lg font-semibold">You've used your free kits</div>
+              <div className="text-lg font-semibold">You&apos;ve used your free kits</div>
               <p className="text-white/70 text-sm mt-1">Upgrade for unlimited kits, brand lock, and saved templates.</p>
             </div>
             <div className="flex items-center gap-3">
