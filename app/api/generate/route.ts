@@ -13,7 +13,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'auth' }, { status: 401 });
   }
   console.log('[api/generate] begin', { userId: user.id });
-  const { payload, controls: rawControls = {} } = await req.json().catch(() => ({ }));
+  const body = await req.json().catch(() => ({}));
+  const payload = body.payload;
+  const rawControls = body.controls ?? {};
   const payloadParse = PayloadSchema.safeParse(payload);
   if (!payloadParse.success) {
     console.warn('[api/generate] bad_request', { userId: user.id, issues: payloadParse.error.issues?.slice?.(0, 3) });
