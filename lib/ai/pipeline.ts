@@ -396,6 +396,11 @@ function composeDraftMessages(facts: Facts, controls: Controls, photoInsights?: 
     'COMPLIANCE: MLS compliant, Fair Housing safe, no protected classes.'
   ].join('\n');
   
+  // Add context-aware shot instructions
+  const shotInstructions = photoInsights && photoInsights.rooms?.length > 0
+    ? 'For "shot" field: Use specific camera movements like "Pan across living room", "Close-up of kitchen island", "Exterior establishing shot"'
+    : 'For "shot" field: Use conceptual visuals like "Property stats animation", "Map zoom to neighborhood", "Agent speaking to camera", "Feature list graphic"';
+
   const userPrompt = [
     `Property Facts: ${JSON.stringify(facts)}`,
     '',
@@ -419,11 +424,45 @@ function composeDraftMessages(facts: Facts, controls: Controls, photoInsights?: 
     '{',
     '  "mlsDesc": string  // MLS description, respect format preference',
     '  "igSlides": string[]  // Instagram carousel slides',  
-    '  "reelScript": string[]  // 4-segment script with VOICE/TEXT/SHOT for each',
-    '  "reelHooks": string[]  // 3 alternative hooks with VOICE and TEXT versions',
+    '  "reelScript": [  // EXACTLY 4 objects, one for each time segment',
+    '    {',
+    '      "time": "[0-3s]",  // MUST be exactly this value',
+    '      "voice": "Hook that stops the scroll (max 200 chars)",',
+    '      "text": "On-screen text (max 40 chars)",',
+    '      "shot": "Camera/visual direction (max 100 chars)"',
+    '    },',
+    '    {',
+    '      "time": "[4-10s]",  // MUST be exactly this value',
+    '      "voice": "Property basics narration (max 200 chars)",',
+    '      "text": "3BR • 2BA • 2000sqft (max 40 chars)",',
+    '      "shot": "Visual element (max 100 chars)"',
+    '    },',
+    '    {',
+    '      "time": "[11-20s]",  // MUST be exactly this value',
+    '      "voice": "Feature highlights (max 200 chars)",',
+    '      "text": "Key features (max 40 chars)",',
+    '      "shot": "Visual element (max 100 chars)"',
+    '    },',
+    '    {',
+    '      "time": "[21-30s]",  // MUST be exactly this value',
+    '      "voice": "Call to action (max 200 chars)",',
+    '      "text": "DM TOUR • Open Sat (max 40 chars)",',
+    '      "shot": "Closing visual (max 100 chars)"',
+    '    }',
+    '  ],',
+    '  "reelHooks": string[]  // 3 alternative opening hooks',
     '  "emailSubject": string  // Email subject line (60 chars max)',
-    '  "emailBody": string  // COMPLETE email: "Hi there," + body + CTA + "Best,\\nYour Realtor"',
+    '  "emailBody": string  // COMPLETE email with greeting and signature',
     '}',
+    '',
+    'CRITICAL REEL REQUIREMENTS:',
+    '• reelScript MUST be an array of EXACTLY 4 objects',
+    '• Each object MUST have ALL fields: time, voice, text, shot',
+    '• NO empty strings - all fields required',
+    '• time values MUST be: "[0-3s]", "[4-10s]", "[11-20s]", "[21-30s]"',
+    '• text field is ON-SCREEN TEXT (like captions), keep it SHORT',
+    shotInstructions,
+    '',
     'Set any non-requested channel outputs to empty string/array.'
   ].filter(Boolean).join('\n');
 
@@ -511,6 +550,51 @@ ${mustMentionFeatures.map(f => `□ Feature "${f}" appears in content`).join('\n
   ];
 }
 
+// Validate reel script structure
+function validateReelScript(script: any[]): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  const expectedTimes = ['[0-3s]', '[4-10s]', '[11-20s]', '[21-30s]'];
+  
+  if (!Array.isArray(script)) {
+    errors.push('reelScript must be an array');
+    return { valid: false, errors };
+  }
+  
+  if (script.length !== 4) {
+    errors.push(`Expected 4 segments, got ${script.length}`);
+  }
+  
+  script.forEach((segment, i) => {
+    if (typeof segment === 'string') {
+      // Legacy format - skip detailed validation
+      return;
+    }
+    
+    if (typeof segment !== 'object') {
+      errors.push(`Segment ${i}: Must be an object`);
+      return;
+    }
+    
+    if (segment.time !== expectedTimes[i]) {
+      errors.push(`Segment ${i}: Wrong time (expected ${expectedTimes[i]}, got ${segment.time})`);
+    }
+    if (!segment.voice || segment.voice.trim() === '') {
+      errors.push(`Segment ${i}: Missing voice`);
+    }
+    if (!segment.text || segment.text.trim() === '') {
+      errors.push(`Segment ${i}: Missing text`);
+    }
+    if (!segment.shot || segment.shot.trim() === '') {
+      errors.push(`Segment ${i}: Missing shot`);
+    }
+    if (segment.text && segment.text.length > 40) {
+      errors.push(`Segment ${i}: Text too long (${segment.text.length}/40 chars)`);
+    }
+  });
+  
+  return { valid: errors.length === 0, errors };
+}
+
 // Apply length caps and trimming to model output.
 function postProcess(o: Output, facts?: Facts, photoInsights?: PhotoInsights): Output {
   const trim = (s: string) => s.trim();
@@ -554,12 +638,68 @@ function postProcess(o: Output, facts?: Facts, photoInsights?: PhotoInsights): O
     console.log('🎣 [HOOKS DEBUG] Raw reelHooks:', o.reelHooks);
   }
 
+  // Process reel script - handle both object and string formats
+  let processedReelScript: any[] = [];
+  if (o.reelScript && Array.isArray(o.reelScript)) {
+    if (o.reelScript.length > 0 && typeof o.reelScript[0] === 'object' && 'voice' in o.reelScript[0]) {
+      // New object format - validate and cap fields
+      processedReelScript = o.reelScript.map((seg: any, i: number) => {
+        const times = ['[0-3s]', '[4-10s]', '[11-20s]', '[21-30s]'];
+        return {
+          time: seg.time || times[i] || '[unknown]',
+          voice: trim(cap(seg.voice || '', 200)),
+          text: trim(cap(seg.text || '', 40)),
+          shot: trim(cap(seg.shot || '', 100))
+        };
+      });
+    } else if (typeof o.reelScript[0] === 'string') {
+      // Legacy string format - try to parse into object format
+      processedReelScript = o.reelScript.map((line: string, i: number) => {
+        const times = ['[0-3s]', '[4-10s]', '[11-20s]', '[21-30s]'];
+        
+        // Try to parse VOICE: TEXT: SHOT: format
+        const voiceMatch = line.match(/VOICE:\s*([^]*?)(?:\s*TEXT:|$)/);
+        const textMatch = line.match(/TEXT:\s*([^]*?)(?:\s*SHOT:|$)/);
+        const shotMatch = line.match(/SHOT:\s*([^]*?)$/);
+        
+        if (voiceMatch || textMatch || shotMatch) {
+          return {
+            time: times[i] || '[unknown]',
+            voice: trim(cap(voiceMatch?.[1] || line, 200)),
+            text: trim(cap(textMatch?.[1] || '', 40)),
+            shot: trim(cap(shotMatch?.[1] || 'Visual element', 100))
+          };
+        } else {
+          // Fallback for unstructured string
+          return {
+            time: times[i] || '[unknown]',
+            voice: trim(cap(line, 200)),
+            text: trim(cap('See details', 40)),
+            shot: trim(cap('Property visual', 100))
+          };
+        }
+      });
+    }
+  }
+  
+  // Ensure exactly 4 segments
+  const times = ['[0-3s]', '[4-10s]', '[11-20s]', '[21-30s]'];
+  while (processedReelScript.length < 4) {
+    processedReelScript.push({
+      time: times[processedReelScript.length],
+      voice: 'Contact for more details',
+      text: 'Learn more',
+      shot: 'Property visual'
+    });
+  }
+  processedReelScript = processedReelScript.slice(0, 4);
+
   return {
     mlsDesc: trim(cap(o.mlsDesc || '', 900)),
     igSlides: (o.igSlides || []).map((s) => trim(cap(s, 110))).slice(0, 7),
     igHashtags: igHashtags,
-    reelScript: (o.reelScript || []).map((s) => trim(cap(s, 500))).slice(0, 4), // Increased limit for full format
-    reelHooks: (o.reelHooks || []).map((s) => trim(cap(s, 150))).slice(0, 3), // Increased for VOICE|TEXT format
+    reelScript: processedReelScript,
+    reelHooks: (o.reelHooks || []).map((s) => trim(cap(s, 150))).slice(0, 3),
     emailSubject: trim(cap(o.emailSubject || '', 70)),
     emailBody: trim(cap(o.emailBody || '', 900)),
   };
@@ -1002,13 +1142,25 @@ export async function generateKit({
   // Debug logging for reel script output
   if (critique.reelScript && critique.reelScript.length > 0) {
     console.log('🎬 [REEL OUTPUT DEBUG] AI generated reelScript:');
-    critique.reelScript.forEach((line, i) => {
-      console.log(`  [${i}]:`, line);
-      // Check if SHOT is present
-      if (!line.includes('SHOT:')) {
-        console.log('    ⚠️ WARNING: No SHOT found in this segment');
+    critique.reelScript.forEach((segment, i) => {
+      if (typeof segment === 'object' && segment.voice) {
+        console.log(`  [${i}]: Object format - time: ${segment.time}, voice: ${segment.voice?.substring(0, 50)}..., text: ${segment.text}, shot: ${segment.shot}`);
+        if (!segment.shot) {
+          console.log('    ⚠️ WARNING: No SHOT in object segment');
+        }
+      } else if (typeof segment === 'string') {
+        console.log(`  [${i}]: String format -`, segment);
+        if (!segment.includes('SHOT:')) {
+          console.log('    ⚠️ WARNING: No SHOT found in string segment');
+        }
       }
     });
+    
+    // Validate the structure
+    const validation = validateReelScript(critique.reelScript);
+    if (!validation.valid) {
+      console.log('    ⚠️ VALIDATION ERRORS:', validation.errors);
+    }
   }
   try {
     const critRes = await callProvider(

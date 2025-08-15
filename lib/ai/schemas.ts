@@ -42,6 +42,15 @@ export const ControlsSchema = z.object({
 });
 export type Controls = z.infer<typeof ControlsSchema>;
 
+// Reel segment structure for enforced format
+export const ReelSegmentSchema = z.object({
+  time: z.enum(['[0-3s]', '[4-10s]', '[11-20s]', '[21-30s]']),
+  voice: z.string().min(1).max(200),
+  text: z.string().min(1).max(40),
+  shot: z.string().min(1).max(100)
+});
+export type ReelSegment = z.infer<typeof ReelSegmentSchema>;
+
 // Expected marketing outputs from the model.
 export const OutputSchema = z.object({
   mlsDesc: z.string().default(''),
@@ -56,7 +65,10 @@ export const OutputSchema = z.object({
     score: z.number().optional(),
     tips: z.string().optional()
   }).optional(),
-  reelScript: z.array(z.string()).default([]),
+  reelScript: z.union([
+    z.array(ReelSegmentSchema).length(4), // New structured format
+    z.array(z.string()) // Legacy string format for backwards compatibility
+  ]).default([]),
   reelHooks: z.array(z.string()).default([]), // Alternative hooks for A/B testing
   emailSubject: z.string().default(''),
   emailBody: z.string().default(''),
@@ -83,7 +95,41 @@ export const OutputJsonSchema = {
       },
       required: ['trending', 'location', 'features', 'targeted', 'content', 'all']
     },
-    reelScript: { type: 'array', items: { type: 'string' } },
+    reelScript: { 
+      type: 'array', 
+      items: { 
+        type: 'object',
+        properties: {
+          time: { 
+            type: 'string',
+            enum: ['[0-3s]', '[4-10s]', '[11-20s]', '[21-30s]']
+          },
+          voice: { 
+            type: 'string',
+            minLength: 1,
+            maxLength: 200,
+            description: 'What the agent says - full voiceover script'
+          },
+          text: { 
+            type: 'string',
+            minLength: 1,
+            maxLength: 40,
+            description: 'On-screen text - ultra-short, readable without sound'
+          },
+          shot: { 
+            type: 'string',
+            minLength: 1,
+            maxLength: 100,
+            description: 'Camera direction or visual element'
+          }
+        },
+        required: ['time', 'voice', 'text', 'shot'],
+        additionalProperties: false
+      },
+      minItems: 4,
+      maxItems: 4,
+      description: 'Exactly 4 segments for 30-second reel'
+    },
     reelHooks: { type: 'array', items: { type: 'string' } },
     emailSubject: { type: 'string' },
     emailBody: { type: 'string' },

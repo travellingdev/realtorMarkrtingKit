@@ -19,11 +19,29 @@ export default function VideoScriptDisplay({ scriptLines }: VideoScriptDisplayPr
   }
 
   // Parse the script lines into structured segments
-  const parseScriptSegment = (lines: string[]): VideoScriptSegment[] => {
+  const parseScriptSegment = (scriptData: any): VideoScriptSegment[] => {
     const segments: VideoScriptSegment[] = [];
     
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
+    if (!scriptData || !Array.isArray(scriptData)) {
+      return segments;
+    }
+    
+    // Check if it's already in object format
+    if (scriptData.length > 0 && typeof scriptData[0] === 'object' && 'voice' in scriptData[0]) {
+      // New object format - use directly
+      return scriptData.map(seg => ({
+        time: seg.time || '',
+        voice: seg.voice || '',
+        text: seg.text || '',
+        shot: seg.shot || ''
+      }));
+    }
+    
+    // Legacy string format parsing
+    for (let i = 0; i < scriptData.length; i++) {
+      const line = scriptData[i];
+      
+      if (typeof line !== 'string') continue;
       
       // Check if this line starts with a time marker
       const timeMatch = line.match(/^\[([^\]]+)\]/);
