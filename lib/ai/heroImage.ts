@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import type { PhotoInsights, RoomAnalysis } from './photoAnalysis';
+import { selectOptimalHero, type HeroSelectionResult } from './heroSelection';
 
 export interface HeroImageOptions {
   overlay?: 'just_listed' | 'open_house' | 'price_reduced' | 'pending' | 'sold' | 'coming_soon';
@@ -80,284 +81,24 @@ export async function selectHeroImage(
   photoInsights?: PhotoInsights,
   propertyType?: string
 ): Promise<{ index: number; reason: string; score: number; alternatives: Array<{index: number; reason: string; score: number}> }> {
-  if (!photoBuffers.length) {
-    return { 
-      index: 0, 
-      reason: 'No photos available', 
-      score: 0,
-      alternatives: []
-    };
-  }
-
-  // Analyze all images for quality and features
-  const imageAnalyses = await Promise.all(
-    photoBuffers.map(async (buffer, index) => {
-      try {
-        const metadata = await sharp(buffer).metadata();
-        const qualityScore = await calculateAdvancedImageQuality(buffer, metadata);
-        const roomType = inferRoomType(photoInsights?.rooms, index);
-        const contextScore = calculateContextualScore(roomType, propertyType, metadata);
-        
-        const totalScore = qualityScore + contextScore;
-        
-        return {
-          index,
-          score: totalScore,
-          reason: buildSelectionReason(roomType, qualityScore, contextScore, metadata),
-          metadata,
-          roomType
-        };
-      } catch (error) {
-        return { 
-          index, 
-          score: 0, 
-          reason: 'Image analysis failed',
-          metadata: null,
-          roomType: 'unknown'
-        };
-      }
-    })
-  );
-
-  // Sort by score to get best options
-  const sortedImages = imageAnalyses.sort((a, b) => b.score - a.score);
+  // Use the unified hero selection logic
+  const result = await selectOptimalHero(photoBuffers, photoInsights, propertyType);
   
-  // Handle edge cases
-  const edgeCaseResult = handleEdgeCases(sortedImages, propertyType);
-  if (edgeCaseResult) {
-    return edgeCaseResult;
-  }
-
-  // Use AI insights as a boost, not replacement
-  if (photoInsights?.heroCandidate && photoInsights.heroCandidate.index < photoBuffers.length) {
-    const aiCandidate = sortedImages.find(img => img.index === photoInsights.heroCandidate!.index);
-    if (aiCandidate && aiCandidate.score > sortedImages[0].score * 0.8) {
-      // AI choice is close enough to top choice, use it
-      return {
-        index: aiCandidate.index,
-        reason: `AI selected: ${aiCandidate.reason}`,
-        score: aiCandidate.score,
-        alternatives: sortedImages.slice(0, 3).filter(img => img.index !== aiCandidate.index)
-      };
-    }
-  }
-
-  const bestImage = sortedImages[0];
+  // Convert to legacy format for backward compatibility
   return {
-    index: bestImage.index,
-    reason: bestImage.reason,
-    score: bestImage.score,
-    alternatives: sortedImages.slice(1, 4) // Top 3 alternatives
+    index: result.selectedIndex,
+    reason: result.reason,
+    score: result.confidence * 10, // Convert confidence to legacy score scale
+    alternatives: result.alternatives.map(alt => ({
+      index: alt.index,
+      reason: alt.reason,
+      score: alt.score
+    }))
   };
 }
 
-async function calculateAdvancedImageQuality(buffer: Buffer, metadata: sharp.Metadata): Promise<number> {
-  let score = 5; // Base score
-
-  // Resolution scoring (higher weight for quality)
-  const pixels = (metadata.width || 0) * (metadata.height || 0);
-  if (pixels >= 2073600) score += 4; // 1920x1080 or higher
-  else if (pixels >= 1036800) score += 3; // 1280x810
-  else if (pixels >= 518400) score += 2; // 960x540
-  else if (pixels >= 307200) score += 1; // 640x480
-  else score -= 2; // Too small
-
-  // Aspect ratio scoring (context-dependent)
-  const aspectRatio = (metadata.width || 1) / (metadata.height || 1);
-  if (aspectRatio >= 1.2 && aspectRatio <= 2.0) score += 2; // Good for most platforms
-  else if (aspectRatio >= 0.8 && aspectRatio <= 1.2) score += 1; // Square works for IG
-  else score -= 1; // Poor aspect ratio
-
-  // Format bonus
-  if (metadata.format === 'jpeg' || metadata.format === 'jpg') score += 1;
-  else if (metadata.format === 'png') score += 0.5;
-
-  // File size analysis (indicates compression quality)
-  const fileSize = buffer.length;
-  const pixelRatio = fileSize / pixels;
-  if (pixelRatio > 0.5) score += 2; // High quality
-  else if (pixelRatio > 0.2) score += 1; // Good quality
-  else if (pixelRatio < 0.1) score -= 1; // Over-compressed
-
-  // Advanced analysis using Sharp stats
-  try {
-    const stats = await sharp(buffer).stats();
-    
-    // Check for proper exposure (avoid too dark/bright)
-    const channels = stats.channels;
-    if (channels && channels.length >= 3) {
-      const avgBrightness = (channels[0].mean + channels[1].mean + channels[2].mean) / 3;
-      if (avgBrightness > 50 && avgBrightness < 200) score += 1; // Good exposure
-      else if (avgBrightness < 30 || avgBrightness > 220) score -= 2; // Poor exposure
-    }
-  } catch (error) {
-    // Stats analysis failed, continue without penalty
-  }
-
-  return Math.max(0, score);
-}
-
-function inferRoomType(rooms: RoomAnalysis[] | undefined, imageIndex: number): string {
-  if (!rooms || imageIndex >= rooms.length) {
-    // Fallback: guess based on typical order
-    if (imageIndex === 0) return 'exterior';
-    if (imageIndex === 1) return 'kitchen';
-    return 'other';
-  }
-  
-  return rooms[imageIndex]?.type || 'other';
-}
-
-function calculateContextualScore(roomType: string, propertyType?: string, metadata?: sharp.Metadata): number {
-  let score = 0;
-  
-  // Base room type scoring
-  const roomScores: Record<string, number> = {
-    exterior: 10,
-    kitchen: 9,
-    living: 8,
-    pool: 9,
-    dining: 7,
-    bedroom: 6,
-    bathroom: 4,
-    office: 4,
-    garage: 2,
-    utility: 1,
-    other: 5
-  };
-  
-  score += roomScores[roomType] || 5;
-  
-  // Property type context boosts
-  if (propertyType) {
-    switch (propertyType.toLowerCase()) {
-      case 'luxury':
-        if (roomType === 'pool' || roomType === 'exterior') score += 2;
-        break;
-      case 'starter home':
-        if (roomType === 'kitchen' || roomType === 'living') score += 2;
-        break;
-      case 'condo':
-        if (roomType === 'living' || roomType === 'kitchen') score += 2;
-        if (roomType === 'exterior') score -= 1; // Shared exterior
-        break;
-      case 'lakefront':
-      case 'waterfront':
-        if (roomType === 'exterior') score += 3;
-        break;
-    }
-  }
-  
-  // Unique feature bonuses
-  if (roomType === 'pool') score += 2;
-  if (roomType === 'exterior' && metadata) {
-    const aspectRatio = (metadata.width || 1) / (metadata.height || 1);
-    if (aspectRatio > 1.5) score += 1; // Landscape exterior preferred
-  }
-  
-  return score;
-}
-
-function buildSelectionReason(roomType: string, qualityScore: number, contextScore: number, metadata: sharp.Metadata | null): string {
-  const reasons = [];
-  
-  // Room type reason
-  const roomReasons: Record<string, string> = {
-    exterior: 'front exterior (classic choice)',
-    kitchen: 'kitchen (high engagement)',
-    living: 'living room (safe choice)',
-    pool: 'pool area (luxury appeal)',
-    dining: 'dining room',
-    bedroom: 'bedroom',
-    bathroom: 'bathroom',
-    office: 'office/flex space',
-    garage: 'garage',
-    other: 'property feature'
-  };
-  
-  reasons.push(roomReasons[roomType] || 'property area');
-  
-  // Quality indicators
-  if (qualityScore > 8) reasons.push('excellent quality');
-  else if (qualityScore > 6) reasons.push('good quality');
-  
-  if (metadata) {
-    const pixels = (metadata.width || 0) * (metadata.height || 0);
-    if (pixels >= 2073600) reasons.push('high resolution');
-  }
-  
-  // Context bonuses
-  if (contextScore > 12) reasons.push('strong marketing appeal');
-  
-  return reasons.join(', ');
-}
-
-function handleEdgeCases(sortedImages: any[], propertyType?: string): { index: number; reason: string; score: number; alternatives: any[] } | null {
-  const hasGoodPhotos = sortedImages.some(img => img.score > 5);
-  
-  if (!hasGoodPhotos) {
-    // All photos are poor quality
-    const bestAvailable = sortedImages[0];
-    if (bestAvailable) {
-      return {
-        index: bestAvailable.index,
-        reason: `Best available photo (suggest retaking for better results)`,
-        score: bestAvailable.score,
-        alternatives: []
-      };
-    }
-  }
-  
-  // Check for specific edge cases
-  const roomTypes = sortedImages.map(img => img.roomType);
-  const hasExterior = roomTypes.includes('exterior');
-  const hasKitchen = roomTypes.includes('kitchen');
-  const hasLiving = roomTypes.includes('living');
-  
-  // Property-specific edge case handling
-  if (propertyType?.toLowerCase() === 'condo' && !hasExterior) {
-    // Condo with no exterior - prioritize interior
-    const interiorOptions = sortedImages.filter(img => img.roomType !== 'exterior');
-    if (interiorOptions.length > 0) {
-      const best = interiorOptions[0];
-      return {
-        index: best.index,
-        reason: `${best.reason} (interior focus for condo)`,
-        score: best.score,
-        alternatives: interiorOptions.slice(1, 3)
-      };
-    }
-  }
-  
-  if (!hasExterior && !hasKitchen && !hasLiving) {
-    // No primary marketing photos - use best available
-    const best = sortedImages[0];
-    return {
-      index: best.index,
-      reason: `${best.reason} (limited photo options)`,
-      score: best.score,
-      alternatives: sortedImages.slice(1, 3)
-    };
-  }
-  
-  return null; // No edge case handling needed
-}
-
-function calculateImageQuality(metadata: sharp.Metadata): number {
-  // Keep original function for backward compatibility
-  let score = 5;
-  const pixels = (metadata.width || 0) * (metadata.height || 0);
-  if (pixels >= 2073600) score += 3;
-  else if (pixels >= 1036800) score += 2;
-  else if (pixels >= 518400) score += 1;
-
-  const aspectRatio = (metadata.width || 1) / (metadata.height || 1);
-  if (aspectRatio >= 1.2 && aspectRatio <= 2.0) score += 1;
-
-  if (metadata.format === 'jpeg' || metadata.format === 'jpg') score += 1;
-
-  return score;
-}
+// Note: Hero selection logic moved to unified heroSelection.ts
+// The functions below are kept for overlay generation and other image processing
 
 export async function generateHeroVariants(
   originalBuffer: Buffer,
@@ -569,4 +310,121 @@ export async function processHeroImage(
     reason: selection.reason,
     photoInsights
   };
+}
+
+/**
+ * Memory-optimized hero image processing
+ * Processes variants one at a time to minimize memory usage
+ */
+export async function processHeroImageStreaming(
+  photoBuffers: Buffer[],
+  photoInsights?: PhotoInsights,
+  options: HeroImageOptions = {}
+): Promise<HeroImageResult> {
+  // Select best hero image (already uses streaming approach)
+  const selection = await selectHeroImage(photoBuffers, photoInsights);
+  const heroBuffer = photoBuffers[selection.index];
+
+  // Generate variants with streaming approach
+  const variants = await generateHeroVariantsStreaming(heroBuffer, options);
+
+  return {
+    original: heroBuffer,
+    variants,
+    selectedIndex: selection.index,
+    reason: selection.reason,
+    photoInsights
+  };
+}
+
+/**
+ * Memory-optimized variant generation
+ * Processes one platform at a time and cleans up immediately
+ */
+async function generateHeroVariantsStreaming(
+  originalBuffer: Buffer,
+  options: HeroImageOptions = {}
+): Promise<HeroImageVariant[]> {
+  const variants: HeroImageVariant[] = [];
+
+  for (const [platform, specs] of Object.entries(PLATFORM_SPECS)) {
+    try {
+      console.log(`[generateHeroVariantsStreaming] Processing ${platform} variant`);
+      
+      const variant = await createPlatformVariantStreaming(
+        originalBuffer,
+        specs,
+        platform,
+        options
+      );
+      
+      variants.push(variant);
+      
+      // Small delay to prevent overwhelming the system
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+    } catch (error) {
+      console.error(`[generateHeroVariantsStreaming] Failed to create ${platform} variant:`, error);
+      // Continue with other variants instead of failing completely
+    }
+  }
+
+  return variants;
+}
+
+/**
+ * Memory-optimized platform variant creation
+ * Cleans up Sharp instances immediately after use
+ */
+async function createPlatformVariantStreaming(
+  buffer: Buffer,
+  specs: { width: number; height: number; name: string },
+  platform: string,
+  options: HeroImageOptions
+): Promise<HeroImageVariant> {
+  let image = sharp(buffer);
+
+  try {
+    // Resize and crop for platform
+    image = image.resize(specs.width, specs.height, {
+      fit: 'cover',
+      position: 'center'
+    });
+
+    // Add overlay if specified
+    if (options.overlay) {
+      const overlayBuffer = await createOverlay(
+        specs.width,
+        specs.height,
+        options,
+        platform
+      );
+      
+      image = image.composite([{
+        input: overlayBuffer,
+        top: 0,
+        left: 0
+      }]);
+    }
+
+    const resultBuffer = await image.jpeg({ quality: 90 }).toBuffer();
+
+    return {
+      name: `hero_${platform}`,
+      buffer: resultBuffer,
+      width: specs.width,
+      height: specs.height,
+      platform: specs.name,
+      description: `Optimized for ${specs.name}${options.overlay ? ` with ${options.overlay} overlay` : ''}`
+    };
+    
+  } finally {
+    // Ensure Sharp instance is cleaned up
+    image.destroy();
+    
+    // Force garbage collection for large images
+    if (buffer.length > 1024 * 1024 && global.gc) {
+      global.gc();
+    }
+  }
 }

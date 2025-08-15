@@ -12,6 +12,22 @@ export const PayloadSchema = z.object({
   tone: z.string().optional(),
   propertyType: z.string().optional(),
   brandVoice: z.string().optional(),
+  
+  // New enhanced fields
+  mlsCompliance: z.string().optional(),
+  targetAudience: z.array(z.string()).optional(),
+  challenges: z.array(z.string()).optional(),
+  priorityFeatures: z.array(z.object({
+    id: z.string(),
+    value: z.string(),
+    priority: z.number(),
+  })).optional(),
+  
+  // Additional v3 enhanced fields
+  schoolDistrict: z.string().optional(),
+  walkScore: z.string().optional(),
+  distanceToDowntown: z.string().optional(),
+  nearbyAmenities: z.array(z.string()).optional(),
 });
 
 export type Payload = z.infer<typeof PayloadSchema>;
@@ -86,10 +102,14 @@ export function generateOutputs(
       ? `Open House \u2022 ${near} ${payload.beds || '?'}BR`
       : '',
     emailBody: include('email')
-      ? `Hi there,\n\nWe're opening the doors at ${addr}.` +
-        (payload.photos && payload.photos.length
-          ? `\n\nPhotos:\n${payload.photos.join('\n')}`
-          : '')
+      ? `Hi there,\n\nWe're opening the doors at ${addr}.\n\n` +
+        `Quick look:\n` +
+        `• ${payload.beds || '?'} bed / ${payload.baths || '?'} bath${payload.sqft ? ` • ${payload.sqft} sq ft` : ''}\n` +
+        `• ${features.length ? features.slice(0, 3).join('\n• ') : 'Great location and condition'}\n` +
+        `• Near ${near} amenities\n\n` +
+        `Open House: Saturday 11-1\n` +
+        `Reply to RSVP or request the full photo tour.\n\n` +
+        `Best,\nYour Realtor`
       : '',
   };
 

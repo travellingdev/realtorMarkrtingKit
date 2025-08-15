@@ -3,9 +3,22 @@
     "allow": [
       "Bash(npm run build:*)",
       "Bash(npm run dev:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(supabase:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node:*)",
+      "Bash(npx next build:*)",
+      "Bash(npx next lint:*)",
+      "WebFetch(domain:localhost)",
+      "Bash(curl:*)",
+      "Bash(npm install:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:cookbook.openai.com)",
+      "WebFetch(domain:platform.openai.com)"
     ],
     "deny": [],
-    "ask": []
+    "ask": [],
+    "defaultMode": "acceptEdits"
   }
 }

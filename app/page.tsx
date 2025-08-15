@@ -2,10 +2,9 @@
 import React, { useRef,useState } from "react";
 import {
   Sparkles,
-  LogIn,
 } from "lucide-react";
 import GradientDecoration from "./components/GradientDecoration";
-import UserMenu from "./components/UserMenu";
+import AuthStatus from "./components/AuthStatus";
 import Hero from "./components/Hero";
 import InstantDemoForm from "./components/InstantDemoForm";
 import OutputsSection from "./components/OutputsSection";
@@ -13,9 +12,12 @@ import PaywallBanner from "./components/PaywallBanner";
 import Pricing from "./components/Pricing";
 import AuthModal from "./components/AuthModal";
 import SurveyModal from "./components/SurveyModal";
+import ContentGenerationProgress from "./components/ContentGenerationProgress";
 import { useRealtorKit } from "@/app/hooks/useRealtorKit";
 import { PROPERTY_TEMPLATES, TONES, BASE_FREE_LIMIT } from "@/lib/constants";
 import { openCheckout } from "@/lib/billing";
+import { SmartUpgradeFloating, SmartUpgradeBanner } from "./components/SmartUpgradePrompt";
+import "./components/ContentGenerationProgress.css";
 
 export default function RealtorsAIMarketingKit() {
   const {
@@ -26,6 +28,7 @@ export default function RealtorsAIMarketingKit() {
     neighborhood, setNeighborhood,
     features, setFeatures,
     photos, setPhotos,
+    photoUrls,
     propertyType, setPropertyType,
     tone, setTone,
     brandVoice, setBrandVoice,
@@ -47,6 +50,7 @@ export default function RealtorsAIMarketingKit() {
     avoidWords, setAvoidWords,
     outputs,
     revealed,
+    kitId,
     kitSample,
     isLoggedIn,
     userTier,
@@ -57,11 +61,19 @@ export default function RealtorsAIMarketingKit() {
     photoInsights,
     showAuth, setShowAuth,
     copyToast, setCopyToast,
+    isGeneratingHero,
+    usageStats,
+    showSmartPrompt,
     onGenerate,
     useSample,
     handleReveal,
     generateHeroImages,
+    applyRecommendedSettings,
+    trackBlockedFeature,
+    dismissSmartPrompt,
     refresh,
+    getGenerateButtonState,
+    buttonState,
   } = useRealtorKit();
 
   const [showPaywall, setShowPaywall] = useState(false);
@@ -180,21 +192,11 @@ export default function RealtorsAIMarketingKit() {
             <a href="#pricing" className="hover:text-white">Pricing</a>
           </nav>
           <div className="flex items-center gap-3">
-            {!isLoggedIn ? (
-              <button
-                onClick={() => setShowAuth(true)}
-                className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
-              >
-                <LogIn className="h-4 w-4" /> Sign in
-              </button>
-            ) : (
-              <div className="inline-flex items-center gap-3">
-                <span className="text-xs text-white/70">
-                  Free kits used: {Math.min(freeKitsUsed, freeLimit)} / {freeLimit}
-                </span>
-                <UserMenu />
-              </div>
-            )}
+            <AuthStatus 
+              freeKitsUsed={freeKitsUsed} 
+              freeLimit={freeLimit} 
+              onSignIn={() => setShowAuth(true)} 
+            />
             <button
               onClick={scrollToDemo}
               className="rounded-2xl bg-white text-neutral-900 px-4 py-2 text-sm font-semibold hover:opacity-90 transition"
@@ -244,9 +246,15 @@ export default function RealtorsAIMarketingKit() {
                 avoidWords={avoidWords} setAvoidWords={setAvoidWords}
                 onGenerate={onGenerate}
                 onUseSample={useSample}
+                onApplyPreset={applyRecommendedSettings}
                 isGenerating={isGenerating}
                 userTier={userTier}
+                freeKitsUsed={freeKitsUsed}
+                freeLimit={freeLimit}
                 onUpgrade={handleUpgrade}
+                onBlockedAttempt={trackBlockedFeature}
+                isLoggedIn={isLoggedIn}
+                buttonState={buttonState}
               />
             </div>
           </div>
@@ -256,7 +264,9 @@ export default function RealtorsAIMarketingKit() {
       <OutputsSection
         outputs={outputs}
         revealed={revealed}
+        kitId={kitId}
         canCopyAll={canCopyAll()}
+        photos={photoUrls}
         onCopyAll={() => {
           if (!outputs) return;
           const allContent = [
@@ -292,7 +302,33 @@ export default function RealtorsAIMarketingKit() {
         onGenerateHero={generateHeroImages}
         userTier={userTier}
         onUpgrade={handleUpgrade}
+        onBlockedAttempt={trackBlockedFeature}
+        isGeneratingHero={isGeneratingHero}
       />
+
+      {/* Content Generation Progress Indicator */}
+      <ContentGenerationProgress 
+        isGenerating={isGenerating}
+        photoCount={photos.length}
+        propertyType={propertyType}
+        isLoggedIn={isLoggedIn}
+        onComplete={() => {
+          // Optional: Add any completion logic here
+          console.log('Content generation complete!');
+        }}
+      />
+
+      {/* Smart upgrade banner for high-usage users */}
+      {usageStats.generationsThisMonth >= 5 && userTier === 'FREE' && (
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+          <SmartUpgradeBanner
+            currentTier={userTier}
+            usageStats={usageStats}
+            onUpgrade={handleUpgrade}
+            showDismiss={false}
+          />
+        </div>
+      )}
 
       <Pricing />
 
@@ -309,6 +345,26 @@ export default function RealtorsAIMarketingKit() {
         }}
       />
       <SurveyModal open={showSurvey} onClose={() => setShowSurvey(false)} onSubmit={onSurveySubmit} />
+      
+      {/* Smart upgrade prompt - appears when user hits blocks repeatedly */}
+      {showSmartPrompt && userTier === 'FREE' && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm">
+          <SmartUpgradeFloating
+            currentTier={userTier}
+            usageStats={usageStats}
+            onUpgrade={handleUpgrade}
+            onDismiss={dismissSmartPrompt}
+            showDismiss={true}
+          />
+        </div>
+      )}
+
+      {/* Toast notifications */}
+      {copyToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-neutral-900/95 backdrop-blur-sm border border-cyan-400/30 rounded-xl px-4 py-2 text-sm text-white shadow-2xl">
+          {copyToast}
+        </div>
+      )}
     </div>
   );
 }

@@ -28,6 +28,20 @@ export function buildPayloadFromForm({
   mlsFormat,
   mustInclude,
   avoidWords,
+  // New enhanced fields
+  mlsCompliance,
+  targetAudience,
+  challenges,
+  priorityFeatures,
+  
+  // Additional v3 enhanced fields
+  schoolDistrict,
+  walkScore,
+  distanceToDowntown,
+  nearbyAmenities,
+  mlsLength,
+  emailLength,
+  socialLength,
 }: {
   address: string;
   beds: string;
@@ -55,12 +69,38 @@ export function buildPayloadFromForm({
   mlsFormat: string;
   mustInclude: string;
   avoidWords: string;
+  // New enhanced fields
+  mlsCompliance?: string;
+  targetAudience?: string[];
+  challenges?: string[];
+  priorityFeatures?: Array<{ id: string; value: string; priority: number }>;
+  
+  // Additional v3 enhanced fields
+  schoolDistrict?: string;
+  walkScore?: string;
+  distanceToDowntown?: string;
+  nearbyAmenities?: string[];
+  mlsLength?: number;
+  emailLength?: number;
+  socialLength?: number;
 }): { payload: Payload; controls: Partial<Controls> } {
   const toStr = (v: string) => (v?.trim() ? v.trim() : undefined);
-  const featureList = features
-    .split(',')
-    .map((f) => f.trim())
-    .filter(Boolean);
+  
+  // Handle both old comma-separated features and new priority features
+  let featureList: string[] = [];
+  if (priorityFeatures && priorityFeatures.length > 0) {
+    // Use priority features if available, sorted by priority
+    featureList = priorityFeatures
+      .sort((a, b) => a.priority - b.priority)
+      .map(f => f.value)
+      .filter(Boolean);
+  } else if (features) {
+    // Fallback to comma-separated features
+    featureList = features
+      .split(',')
+      .map((f) => f.trim())
+      .filter(Boolean);
+  }
 
   const payload: Payload = {
     address: toStr(address),
@@ -73,6 +113,18 @@ export function buildPayloadFromForm({
     tone: toStr(tone),
     propertyType: toStr(propertyType),
     brandVoice: toStr(brandVoice),
+    
+    // New enhanced fields
+    mlsCompliance: toStr(mlsCompliance || ''),
+    targetAudience: targetAudience && targetAudience.length ? targetAudience : undefined,
+    challenges: challenges && challenges.length ? challenges : undefined,
+    priorityFeatures: priorityFeatures && priorityFeatures.length ? priorityFeatures : undefined,
+    
+    // Additional v3 enhanced fields
+    schoolDistrict: toStr(schoolDistrict || ''),
+    walkScore: toStr(walkScore || ''),
+    distanceToDowntown: toStr(distanceToDowntown || ''),
+    nearbyAmenities: nearbyAmenities && nearbyAmenities.length ? nearbyAmenities : undefined,
   };
   const controls: Partial<Controls> = {
     channels: channels && channels.length ? channels : undefined,

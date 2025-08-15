@@ -4,34 +4,66 @@ import { supabaseServer, supabaseAdmin } from '@/lib/supabaseClients';
 import { generateOutputs, PayloadSchema } from '@/lib/generator';
 import { buildFacts, generateKit, PROMPT_VERSION } from '@/lib/ai/pipeline';
 import { ControlsSchema } from '@/lib/ai/schemas';
-import { getTierConfig, canUseFeature, isQuotaExceeded } from '@/lib/tiers';
+import { getTierConfig, canUseFeature, isQuotaExceeded, canAnalyzePhotosWithTrial, getPhotoAnalysisMessage } from '@/lib/tiers';
 
 export async function POST(req: Request) {
   const startedAt = Date.now();
   const sb = supabaseServer();
   const { data: { user } } = await sb.auth.getUser();
+  
+  // Allow anonymous users with session-based limits
+  let userId: string;
+  let userTier: string;
+  let quotaUsed: number;
+  let extraQuota: number;
+  let isAnonymous = false;
+  
   if (!user) {
-    console.warn('[api/generate] unauthenticated request');
-    return NextResponse.json({ error: 'auth' }, { status: 401 });
+    // Check if anonymous generation is allowed (handled by frontend)
+    // Generate a temporary anonymous ID for this session
+    const body = await req.json();
+    const anonId = body.anonymousId;
+    
+    if (!anonId) {
+      console.warn('[api/generate] unauthenticated request without anonymous ID');
+      return NextResponse.json({ error: 'auth' }, { status: 401 });
+    }
+    
+    console.log('[api/generate] anonymous request', { anonId });
+    userId = anonId;
+    userTier = 'ANONYMOUS';
+    quotaUsed = 0;
+    extraQuota = 0;
+    isAnonymous = true;
+    
+    // Put the body back for later parsing
+    req = new Request(req.url, {
+      method: req.method,
+      headers: req.headers,
+      body: JSON.stringify(body)
+    });
+  } else {
+    // Get user profile and tier information for authenticated users
+    const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
+    userId = user.id;
+    userTier = profile?.plan || 'FREE';
+    quotaUsed = profile?.quota_used || 0;
+    extraQuota = profile?.quota_extra || 0;
   }
   
-  // Get user profile and tier information
-  const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
-  const userTier = profile?.plan || 'FREE';
-  const tierConfig = getTierConfig(userTier);
-  const quotaUsed = profile?.quota_used || 0;
-  const extraQuota = profile?.quota_extra || 0;
+  const tierConfig = getTierConfig(userTier === 'ANONYMOUS' ? 'FREE' : userTier);
   
   console.log('[api/generate] begin', { 
-    userId: user.id, 
-    tier: userTier, 
+    userId: userId, 
+    tier: userTier,
+    isAnonymous,
     quotaUsed, 
     limit: tierConfig.kitsPerMonth + extraQuota 
   });
   
-  // Check quota limits
-  if (isQuotaExceeded(userTier, quotaUsed, extraQuota)) {
-    console.warn('[api/generate] quota exceeded', { userId: user.id, tier: userTier, used: quotaUsed });
+  // Check quota limits (skip for anonymous users - handled by frontend)
+  if (!isAnonymous && isQuotaExceeded(userTier, quotaUsed, extraQuota)) {
+    console.warn('[api/generate] quota exceeded', { userId: userId, tier: userTier, used: quotaUsed });
     return NextResponse.json({ 
       error: 'quota_exceeded', 
       details: {
@@ -47,52 +79,108 @@ export async function POST(req: Request) {
   const rawControls = body.controls ?? {};
   const payloadParse = PayloadSchema.safeParse(payload);
   if (!payloadParse.success) {
-    console.warn('[api/generate] bad_request', { userId: user.id, issues: payloadParse.error.issues?.slice?.(0, 3) });
+    console.warn('[api/generate] bad_request', { userId: userId, issues: payloadParse.error.issues?.slice?.(0, 3) });
     return NextResponse.json({ error: 'bad_request', details: payloadParse.error.flatten() }, { status: 400 });
   }
   const controlsParse = ControlsSchema.safeParse(rawControls);
   if (!controlsParse.success) {
-    console.warn('[api/generate] bad_request', { userId: user.id, issues: controlsParse.error.issues?.slice?.(0, 3) });
+    console.warn('[api/generate] bad_request', { userId: userId, issues: controlsParse.error.issues?.slice?.(0, 3) });
     return NextResponse.json({ error: 'bad_request', details: controlsParse.error.flatten() }, { status: 400 });
   }
   const payloadData = payloadParse.data;
   const controlsData = controlsParse.data;
+  
+  // Debug log incoming channels
+  console.log('[api/generate] DEBUG: Incoming request', {
+    userId: userId,
+    tier: userTier,
+    isAnonymous,
+    quotaUsed,
+    limit: tierConfig.kitsPerMonth + extraQuota,
+    incomingChannels: controlsData.channels,
+  });
   const facts = buildFacts(payloadData);
   const promptVersion = PROMPT_VERSION;
   const factsHash = createHash('sha256')
     .update(JSON.stringify({ facts, controls: controlsData, promptVersion }))
     .digest('hex');
-  const { data: kit, error } = await sb
-    .from('kits')
-    .insert({
-      user_id: user.id,
+  
+  // For anonymous users, create a temporary kit object without database
+  let kit: any;
+  
+  if (isAnonymous) {
+    // Create a temporary kit for anonymous users
+    kit = {
+      id: `anon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      user_id: userId,
       payload: payloadData,
       status: 'PROCESSING',
       facts_hash: factsHash,
-    })
-    .select('*')
-    .single();
-  if (error) {
-    console.error('[api/generate] insert kits failed', { userId: user.id, error });
-    return NextResponse.json({ error: 'db' }, { status: 500 });
+      created_at: new Date().toISOString()
+    };
+    console.log('[api/generate] anonymous kit created', { 
+      userId: userId, 
+      kitId: kit.id
+    });
+  } else {
+    // Regular database insert for authenticated users
+    const { data: dbKit, error } = await sb
+      .from('kits')
+      .insert({
+        user_id: userId,
+        payload: payloadData,
+        status: 'PROCESSING',
+        facts_hash: factsHash,
+      })
+      .select('*')
+      .single();
+    
+    if (error) {
+      console.error('[api/generate] insert kits failed', { userId: userId, error });
+      return NextResponse.json({ error: 'db' }, { status: 500 });
+    }
+    
+    kit = dbKit;
+    console.log('[api/generate] kit row created', { 
+      userId: userId, 
+      kitId: kit.id,
+      kitIdType: typeof kit.id,
+      kitIdValue: kit.id
+    });
   }
-  console.log('[api/generate] kit row created', { userId: user.id, kitId: kit.id });
 
   async function updateKitReady(fields: any) {
-    const { error: updErr } = await sb.from('kits').update({ status: 'READY', ...fields }).eq('id', kit.id);
+    // Skip database update for anonymous users
+    if (isAnonymous) {
+      Object.assign(kit, fields, { status: 'READY' });
+      return true;
+    }
+    
+    // Remove fields that don't exist in the database schema
+    const { photo_urls, ...safeFields } = fields;
+    
+    const { error: updErr } = await sb.from('kits').update({ status: 'READY', ...safeFields }).eq('id', kit.id);
     if (!updErr) return true;
+    
     console.error('[api/generate] update via user client failed', { kitId: kit.id, updErr });
-    try {
-      const admin = supabaseAdmin();
-      const { error: adminErr } = await admin.from('kits').update({ status: 'READY', ...fields }).eq('id', kit.id);
-      if (adminErr) {
-        console.error('[api/generate] update via admin client failed', { kitId: kit.id, adminErr });
+    
+    // Try admin client only if service key is available
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const admin = supabaseAdmin();
+        const { error: adminErr } = await admin.from('kits').update({ status: 'READY', ...safeFields }).eq('id', kit.id);
+        if (adminErr) {
+          console.error('[api/generate] update via admin client failed', { kitId: kit.id, adminErr });
+          return false;
+        }
+        console.log('[api/generate] update via admin client success', { kitId: kit.id });
+        return true;
+      } catch (e: any) {
+        console.error('[api/generate] admin update threw', { kitId: kit.id, error: String(e?.message || e) });
         return false;
       }
-      console.log('[api/generate] update via admin client success', { kitId: kit.id });
-      return true;
-    } catch (e: any) {
-      console.error('[api/generate] admin update threw', { kitId: kit.id, error: String(e?.message || e) });
+    } else {
+      console.warn('[api/generate] Admin key not configured, cannot retry update');
       return false;
     }
   }
@@ -115,8 +203,8 @@ export async function POST(req: Request) {
       quality_score: cache.quality_score,
       prompt_version: promptVersion,
     });
-    console.log('[api/generate] cache hit', { userId: user.id, kitId: kit.id, sourceKit: cache.id });
-    console.log('[api/generate] done', { userId: user.id, ms: Date.now() - startedAt });
+    console.log('[api/generate] cache hit', { userId: userId, kitId: kit.id, sourceKit: cache.id });
+    console.log('[api/generate] done', { userId: userId, ms: Date.now() - startedAt });
     return NextResponse.json({ kitId: kit.id });
   }
 
@@ -126,18 +214,56 @@ export async function POST(req: Request) {
     const tierAwareFacts = { ...facts };
     const tierAwareControls = { ...controlsData };
     
-    // Remove photos if vision is not available in tier
-    if (!canUseFeature(userTier, 'vision')) {
+    // Check if user can analyze photos (includes trial system for FREE tier)
+    // Anonymous users get limited photo analysis
+    const canAnalyzePhotos = isAnonymous ? true : canAnalyzePhotosWithTrial(userTier, quotaUsed);
+    if (!canAnalyzePhotos) {
       tierAwareFacts.photos = [];
-      console.log('[api/generate] Vision disabled for tier', { userId: user.id, tier: userTier });
+      console.log('[api/generate] Photo analysis not available', { 
+        userId: userId, 
+        tier: userTier, 
+        quotaUsed,
+        message: getPhotoAnalysisMessage(userTier, quotaUsed)
+      });
+    } else {
+      console.log('[api/generate] Photo analysis enabled', { 
+        userId: userId, 
+        tier: userTier,
+        isAnonymous,
+        photoCount: tierAwareFacts.photos?.length || 0,
+        message: isAnonymous ? 'Anonymous photo analysis (limited)' : getPhotoAnalysisMessage(userTier, quotaUsed)
+      });
     }
     
-    // Filter channels if not all platforms available
+    // Channel filtering based on tier
     if (!canUseFeature(userTier, 'allPlatforms')) {
-      // Starter tier gets basic platforms only
-      tierAwareControls.channels = ['mls', 'email'];
-      console.log('[api/generate] Platform filtering for tier', { userId: user.id, tier: userTier });
+      // FREE tier: Filter out premium channels if quota exceeded
+      if (isQuotaExceeded(userTier, quotaUsed, extraQuota)) {
+        // Only allow MLS and Email when quota exceeded
+        const allowedChannels = ['mls', 'email'];
+        tierAwareControls.channels = (tierAwareControls.channels || []).filter(ch => 
+          allowedChannels.includes(ch)
+        );
+        console.log('[api/generate] Quota exceeded - limiting to basic channels', { 
+          userId: userId, 
+          tier: userTier,
+          original: controlsData.channels,
+          filtered: tierAwareControls.channels
+        });
+      }
     }
+    
+    console.log('[api/generate] Channel configuration', {
+      userTier,
+      quotaUsed,
+      limit: tierConfig.kitsPerMonth + extraQuota,
+      selectedChannels: tierAwareControls.channels,
+      hasAllPlatforms: canUseFeature(userTier, 'allPlatforms'),
+    });
+    
+    console.log('[api/generate] DEBUG: Final channels being sent to pipeline', {
+      channelsToGenerate: tierAwareControls.channels,
+    });
     
     const { outputs, flags, promptVersion, tokenCounts, photoInsights } = await generateKit({ 
       facts: tierAwareFacts, 
@@ -159,17 +285,43 @@ export async function POST(req: Request) {
     
     if (photoInsights) {
       kitData.photo_insights = photoInsights;
+      // Store photo URLs in photo_insights instead of separate field
+      if (tierAwareFacts.photos && tierAwareFacts.photos.length > 0) {
+        kitData.photo_insights.photos = tierAwareFacts.photos;
+      }
       console.log('[api/generate] Photo analysis included', { 
         rooms: photoInsights.rooms.length,
         features: photoInsights.features.length,
-        heroCandidate: photoInsights.heroCandidate?.index
+        sellingPoints: photoInsights.sellingPoints.length,
+        marketingAngles: photoInsights.marketingAngles.length,
+        heroCandidate: photoInsights.heroCandidate?.index,
+        keyFeatures: photoInsights.features.slice(0, 3)
+      });
+      
+      // Log if photo analysis was successfully integrated into outputs
+      const hasPhotoFeatures = outputs.mlsDesc.toLowerCase().includes(photoInsights.features[0]?.toLowerCase() || '') ||
+                              outputs.igSlides.some(slide => photoInsights.features.some(f => slide.toLowerCase().includes(f.toLowerCase()))) ||
+                              outputs.emailBody.toLowerCase().includes(photoInsights.features[0]?.toLowerCase() || '');
+      
+      console.log(`📝 [api/generate] Photo analysis integration check:`, {
+        photoFeaturesFound: photoInsights.features.length,
+        photoFeaturesInContent: hasPhotoFeatures,
+        mlsLength: outputs.mlsDesc.length,
+        igSlides: outputs.igSlides.length,
+        sampleFeature: photoInsights.features[0] || 'none'
+      });
+    } else {
+      console.log('📷 [api/generate] No photo analysis performed', { 
+        tier: userTier, 
+        quotaUsed, 
+        photoCount: facts.photos?.length || 0 
       });
     }
     
     await updateKitReady(kitData);
-    console.log('[api/generate] AI generation success', { userId: user.id, kitId: kit.id, ms: latencyMs });
+    console.log('[api/generate] AI generation success', { userId: userId, kitId: kit.id, ms: latencyMs });
   } catch (e: any) {
-    console.error('[api/generate] AI generation failed, falling back', { userId: user.id, kitId: kit.id, error: String(e?.message || e) });
+    console.error('[api/generate] AI generation failed, falling back', { userId: userId, kitId: kit.id, error: String(e?.message || e) });
     const outputsLocal = generateOutputs(payloadData, controlsData);
     const latencyMs = Date.now() - startedAt;
     await updateKitReady({
@@ -180,9 +332,26 @@ export async function POST(req: Request) {
       quality_score: 100,
       prompt_version: null,
     });
-    console.log('[api/generate] local generation success', { userId: user.id, kitId: kit.id, ms: latencyMs });
+    console.log('[api/generate] local generation success', { userId: userId, kitId: kit.id, ms: latencyMs });
   }
 
-  console.log('[api/generate] done', { userId: user.id, ms: Date.now() - startedAt });
+  console.log('[api/generate] done', { 
+    userId: userId, 
+    ms: Date.now() - startedAt,
+    returningKitId: kit.id,
+    kitIdType: typeof kit.id,
+    isAnonymous
+  });
+  
+  // For anonymous users, return outputs directly since they won't be able to fetch from DB
+  if (isAnonymous) {
+    return NextResponse.json({ 
+      kitId: kit.id,
+      status: 'READY',
+      outputs: kit.outputs,
+      photo_insights: kit.photo_insights
+    });
+  }
+  
   return NextResponse.json({ kitId: kit.id });
 }

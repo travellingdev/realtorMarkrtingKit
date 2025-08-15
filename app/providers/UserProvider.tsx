@@ -17,21 +17,46 @@ type UserState = {
   loading: boolean;
   error: any;
   refresh: () => void;
+  isInitialized: boolean;
 };
 
 const UserContext = createContext<UserState>({
   user: null,
   plan: null,
   quota: null,
-  loading: true,
+  loading: false,
   error: null,
   refresh: () => {},
+  isInitialized: false,
 });
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-export function UserProvider({ children }: { children: React.ReactNode }) {
-  const { data, error, isLoading, mutate: localMutate } = useSWR('/api/me', fetcher, { revalidateOnFocus: false });
+interface UserProviderProps {
+  children: React.ReactNode;
+  initialData?: {
+    user: User | null;
+    plan: string | null;
+    quota: Quota;
+  };
+}
+
+export function UserProvider({ children, initialData }: UserProviderProps) {
+  // Use initial data from server, only fetch if not provided
+  const { data, error, isLoading, mutate: localMutate } = useSWR(
+    '/api/me', 
+    fetcher, 
+    { 
+      fallbackData: initialData,
+      revalidateOnFocus: false,
+      revalidateOnMount: !initialData, // Only fetch on mount if no initial data
+      dedupingInterval: 5000,
+      revalidateIfStale: false,
+    }
+  );
+
+  // No need for initial load tracking - we have server data
+  const [isInitialized] = React.useState(!!initialData);
 
   useEffect(() => {
     const sb = supabaseBrowser();
@@ -44,12 +69,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [localMutate]);
 
   const value: UserState = {
-    user: data?.user ?? null,
-    plan: data?.plan ?? null,
-    quota: data?.quota ?? null,
-    loading: isLoading,
+    user: data?.user ?? initialData?.user ?? null,
+    plan: data?.plan ?? initialData?.plan ?? null,
+    quota: data?.quota ?? initialData?.quota ?? null,
+    loading: isLoading && !initialData,
     error,
     refresh: () => localMutate(),
+    isInitialized,
   };
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;

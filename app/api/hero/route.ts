@@ -1,7 +1,99 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseClients';
-import { processHeroImage, type HeroImageOptions } from '@/lib/ai/heroImage';
+import { processHeroImage, processHeroImageStreaming, type HeroImageOptions } from '@/lib/ai/heroImage';
 import { getTierConfig, canUseFeature } from '@/lib/tiers';
+
+interface PhotoDownloadError {
+  url: string;
+  attempts: number;
+  lastError: string;
+}
+
+interface PhotoDownloadResult {
+  photoBuffers: Buffer[];
+  errors: PhotoDownloadError[];
+}
+
+// Download photos with exponential backoff retry logic
+async function downloadPhotosWithRetry(
+  photoUrls: string[], 
+  maxRetries: number = 3,
+  initialDelay: number = 1000
+): Promise<PhotoDownloadResult> {
+  const photoBuffers: Buffer[] = [];
+  const errors: PhotoDownloadError[] = [];
+
+  const downloadWithRetry = async (url: string): Promise<Buffer | null> => {
+    let lastError = '';
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        
+        const response = await fetch(url, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'RealtorMarketing/1.0'
+          }
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        
+        if (arrayBuffer.byteLength === 0) {
+          throw new Error('Empty response body');
+        }
+        
+        return Buffer.from(arrayBuffer);
+        
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error);
+        console.warn(`[downloadPhotos] Attempt ${attempt}/${maxRetries} failed for ${url}:`, lastError);
+        
+        // Don't retry on certain errors
+        if (lastError.includes('404') || lastError.includes('403') || lastError.includes('401')) {
+          break;
+        }
+        
+        // Wait before retrying (exponential backoff)
+        if (attempt < maxRetries) {
+          const delay = initialDelay * Math.pow(2, attempt - 1);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    errors.push({ url, attempts: maxRetries, lastError });
+    return null;
+  };
+
+  // Download photos concurrently but with controlled parallelism
+  const batchSize = 3; // Download 3 at a time to avoid overwhelming servers
+  for (let i = 0; i < photoUrls.length; i += batchSize) {
+    const batch = photoUrls.slice(i, i + batchSize);
+    const batchPromises = batch.map(url => downloadWithRetry(url));
+    const batchResults = await Promise.allSettled(batchPromises);
+    
+    for (const result of batchResults) {
+      if (result.status === 'fulfilled' && result.value) {
+        photoBuffers.push(result.value);
+      }
+    }
+    
+    // Small delay between batches to be respectful to servers
+    if (i + batchSize < photoUrls.length) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+
+  return { photoBuffers, errors };
+}
 
 export async function POST(req: Request) {
   const sb = supabaseServer();
@@ -52,29 +144,39 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'no_photos' }, { status: 400 });
     }
 
-    // Download photo buffers
-    const photoBuffers: Buffer[] = [];
-    for (const url of photoUrls.slice(0, 10)) { // Limit to 10 photos
-      try {
-        const response = await fetch(url);
-        if (response.ok) {
-          const arrayBuffer = await response.arrayBuffer();
-          photoBuffers.push(Buffer.from(arrayBuffer));
-        }
-      } catch (error) {
-        console.warn('Failed to download photo:', url, error);
-      }
-    }
+    // Download photo buffers with retry logic and proper error handling
+    const { photoBuffers, errors } = await downloadPhotosWithRetry(photoUrls.slice(0, 10));
 
     if (!photoBuffers.length) {
-      return NextResponse.json({ error: 'photos_unavailable' }, { status: 400 });
+      console.error('[api/hero] No photos could be downloaded', { 
+        totalUrls: photoUrls.length, 
+        errors: errors.length,
+        errorDetails: errors.map(e => ({ url: e.url, attempts: e.attempts, lastError: e.lastError }))
+      });
+      return NextResponse.json({ 
+        error: 'photos_unavailable',
+        details: {
+          totalPhotos: photoUrls.length,
+          failedDownloads: errors.length,
+          message: 'All photo downloads failed after retries'
+        }
+      }, { status: 400 });
+    }
+
+    // Log partial failures for debugging
+    if (errors.length > 0) {
+      console.warn('[api/hero] Some photos failed to download', {
+        successful: photoBuffers.length,
+        failed: errors.length,
+        successRate: `${Math.round((photoBuffers.length / photoUrls.slice(0, 10).length) * 100)}%`
+      });
     }
 
     // Get photo insights if available
     const photoInsights = kit.photo_insights;
 
-    // Generate hero image variants
-    const heroResult = await processHeroImage(
+    // Generate hero image variants with memory optimization
+    const heroResult = await processHeroImageStreaming(
       photoBuffers,
       photoInsights,
       options

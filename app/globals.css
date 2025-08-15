@@ -1,1 +1,23 @@
-@tailwind base;@tailwind components;@tailwind utilities;html,body{height:100%;background-color:#0a0a0a}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+  background-color: #0a0a0a;
+}
+
+/* Hero Image Module Animations */
+@keyframes progress {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+.animate-progress {
+  animation: progress 20s ease-in-out;
+}

@@ -1,0 +1,401 @@
+// COMMENTED OUT - Reverting to test original behavior
+/* 
+import type { Facts } from './schemas';
+
+/**
+ * Generate property-based insights when no photos are available
+ * These functions create equivalent content to photo insights using property facts
+ */
+
+// Infer buyer profile from property type
+export function inferBuyerFromPropertyType(propertyType?: string): string {
+  const profiles: Record<string, string> = {
+    'Starter Home': 'First-time buyers seeking affordability and potential',
+    'Luxury Estate': 'Discerning buyers seeking premium features and exclusivity',
+    'Investment Property': 'Savvy investors looking for ROI and rental potential',
+    'Family Home': 'Growing families prioritizing space and community',
+    'Condo': 'Urban professionals or downsizers seeking convenience',
+    'Fixer-Upper': 'Creative buyers with vision for transformation',
+    'Townhouse': 'Buyers wanting low-maintenance with community feel',
+    'Vacation Home': 'Lifestyle buyers seeking retreat and relaxation'
+  };
+  
+  return profiles[propertyType || ''] || 'Motivated buyers seeking their ideal home';
+}
+
+// Generate conversion hooks from property specifications
+export function generateHooksFromSpecs(facts: Facts): string[] {
+  const hooks: string[] = [];
+  
+  // Bed/bath hook
+  if (facts.beds && facts.baths) {
+    const beds = parseInt(facts.beds) || 0;
+    const baths = parseFloat(facts.baths) || 0;
+    
+    if (beds >= 4) {
+      hooks.push(`Rare ${beds}-bedroom opportunity in ${facts.neighborhood || 'this area'}`);
+    } else if (beds === 3 && baths >= 2) {
+      hooks.push(`Perfect ${beds}/${baths} layout for modern living`);
+    } else {
+      hooks.push(`Efficient ${beds}BR/${baths}BA design maximizes every square foot`);
+    }
+  }
+  
+  // Square footage hook
+  if (facts.sqft) {
+    const sqft = parseInt(facts.sqft) || 0;
+    if (sqft > 2500) {
+      hooks.push(`Sprawling ${sqft} sq ft of refined living space`);
+    } else if (sqft > 1500) {
+      hooks.push(`${sqft} sq ft perfectly balanced for comfort and efficiency`);
+    } else {
+      hooks.push(`Smart ${sqft} sq ft layout feels larger than it measures`);
+    }
+  }
+  
+  // Neighborhood hook
+  if (facts.neighborhood) {
+    hooks.push(`${facts.neighborhood} location combines convenience with character`);
+  }
+  
+  // Property type hook
+  if (facts.propertyType) {
+    const typeHooks: Record<string, string> = {
+      'Starter Home': 'Your first home journey starts here',
+      'Luxury Estate': 'Where sophistication meets comfort',
+      'Investment Property': 'Cash flow opportunity in prime location',
+      'Family Home': 'Where memories are waiting to be made',
+      'Condo': 'Lock-and-leave lifestyle in the heart of it all',
+      'Fixer-Upper': 'Bring your vision to this diamond in the rough',
+    };
+    if (typeHooks[facts.propertyType]) {
+      hooks.push(typeHooks[facts.propertyType]);
+    }
+  }
+  
+  // If we don't have enough hooks, add generic but compelling ones
+  while (hooks.length < 3) {
+    const genericHooks = [
+      'This one will make you cancel your other showings',
+      'The kind of home that gets multiple offers',
+      'Everything on your wishlist might be here',
+      'Stop scrolling - this is the one',
+    ];
+    hooks.push(genericHooks[hooks.length]);
+  }
+  
+  return hooks.slice(0, 3);
+}
+
+// Extract the most compelling headline feature
+export function extractHeadlineFeature(facts: Facts): string {
+  // Priority order for headline features
+  const priorityPhrases = [
+    'chef', 'kitchen', 'renovated', 'new', 'updated', 'pool', 
+    'view', 'master', 'primary', 'suite', 'garage', 'yard',
+    'deck', 'patio', 'fireplace', 'hardwood', 'granite'
+  ];
+  
+  if (facts.features && facts.features.length > 0) {
+    // Look for priority features
+    for (const phrase of priorityPhrases) {
+      const feature = facts.features.find(f => 
+        f.toLowerCase().includes(phrase)
+      );
+      if (feature) return feature;
+    }
+    // Return first feature if no priority matches
+    return facts.features[0];
+  }
+  
+  // Fallback to property basics
+  if (facts.beds && facts.baths && facts.sqft) {
+    return `${facts.beds}BR/${facts.baths}BA with ${facts.sqft} sq ft`;
+  } else if (facts.propertyType) {
+    return `${facts.propertyType} in ${facts.neighborhood || 'prime location'}`;
+  }
+  
+  return 'Move-in ready home';
+}
+
+// Generate lifestyle scenarios from features
+export function generateLifestyleFromFeatures(features: string[]): string[] {
+  const scenarios: string[] = [];
+  
+  const featureToLifestyle: Record<string, string> = {
+    'kitchen': 'Sunday dinners with family gathered around your island',
+    'yard': 'Summer barbecues and kids playing in your private outdoor oasis',
+    'garage': 'Projects and hobbies in your organized workspace',
+    'master': 'Peaceful mornings in your private retreat',
+    'primary': 'Your sanctuary away from the world',
+    'deck': 'Morning coffee with sunrise views from your deck',
+    'patio': 'Evening entertaining under the stars',
+    'pool': 'Weekend pool parties and daily lap swims',
+    'fireplace': 'Cozy winter nights by the crackling fire',
+    'office': 'Productive work-from-home days in your dedicated space',
+    'gym': 'Daily workouts without leaving home',
+    'garden': 'Fresh herbs and vegetables from your own garden',
+    'hardwood': 'Bare feet on warm hardwood floors',
+    'granite': 'Preparing meals on stunning granite surfaces',
+    'view': 'Daily inspiration from breathtaking views',
+  };
+  
+  if (features && features.length > 0) {
+    features.forEach(feature => {
+      const lowerFeature = feature.toLowerCase();
+      for (const [key, lifestyle] of Object.entries(featureToLifestyle)) {
+        if (lowerFeature.includes(key) && scenarios.length < 4) {
+          scenarios.push(lifestyle);
+          break;
+        }
+      }
+    });
+  }
+  
+  // Add generic lifestyle scenarios if needed
+  const genericScenarios = [
+    'Creating lasting memories in every room',
+    'Hosting gatherings that friends still talk about',
+    'Finding your rhythm in a home that fits your life',
+    'Building equity while living your best life',
+  ];
+  
+  while (scenarios.length < 3) {
+    scenarios.push(genericScenarios[scenarios.length]);
+  }
+  
+  return scenarios.slice(0, 4).map((s, i) => `  ${i + 1}. ${s}`);
+}
+
+// Map features to emotional benefits
+export function mapFeaturesToBenefits(features: string[]): string[] {
+  const benefits: string[] = [];
+  
+  const featureBenefitMap: Record<string, { benefit: string; emotion: string }> = {
+    'kitchen': { benefit: 'Become the host everyone wants to visit', emotion: 'pride' },
+    'new roof': { benefit: 'Sleep soundly knowing you\'re protected', emotion: 'security' },
+    'updated': { benefit: 'Move in without lifting a finger', emotion: 'relief' },
+    'renovated': { benefit: 'Enjoy modern comfort with zero work', emotion: 'satisfaction' },
+    'hardwood': { benefit: 'Experience timeless elegance daily', emotion: 'sophistication' },
+    'garage': { benefit: 'Never scrape ice off your windshield', emotion: 'convenience' },
+    'yard': { benefit: 'Give kids/pets room to roam freely', emotion: 'freedom' },
+    'pool': { benefit: 'Vacation at home every weekend', emotion: 'luxury' },
+    'fireplace': { benefit: 'Create the coziest room in the neighborhood', emotion: 'warmth' },
+    'master': { benefit: 'Escape to your personal sanctuary', emotion: 'tranquility' },
+    'deck': { benefit: 'Expand your living space outdoors', emotion: 'spaciousness' },
+    'storage': { benefit: 'Finally have a place for everything', emotion: 'organization' },
+    'windows': { benefit: 'Save on energy while bathing in light', emotion: 'brightness' },
+    'location': { benefit: 'Walk to everything that matters', emotion: 'connectivity' },
+  };
+  
+  if (features && features.length > 0) {
+    features.forEach(feature => {
+      const lowerFeature = feature.toLowerCase();
+      for (const [key, mapping] of Object.entries(featureBenefitMap)) {
+        if (lowerFeature.includes(key) && benefits.length < 5) {
+          benefits.push(`  • ${feature} → ${mapping.benefit} (${mapping.emotion})`);
+          break;
+        }
+      }
+      // If no specific mapping, create a generic one
+      if (benefits.length < features.length && benefits.length < 5) {
+        if (!benefits.some(b => b.includes(feature))) {
+          benefits.push(`  • ${feature} → Enhanced daily living (comfort)`);
+        }
+      }
+    });
+  }
+  
+  // Add some generic benefits if needed
+  if (benefits.length === 0) {
+    benefits.push(
+      '  • Move-in ready → Start living immediately (excitement)',
+      '  • Prime location → Everything within reach (convenience)',
+      '  • Thoughtful layout → Space that works for you (functionality)'
+    );
+  }
+  
+  return benefits.slice(0, 5);
+}
+
+// Generate urgency triggers based on property and market
+export function generateUrgencyTriggers(facts: Facts): string[] {
+  const triggers: string[] = [];
+  
+  // Property-specific urgency
+  if (facts.propertyType) {
+    const typeUrgency: Record<string, string> = {
+      'Starter Home': 'First-time buyer incentives expire soon',
+      'Luxury Estate': 'Unique properties like this rarely become available',
+      'Investment Property': 'Rental demand is at an all-time high',
+      'Family Home': 'School year consideration - settle in before fall',
+      'Condo': 'Only unit available in this sought-after building',
+      'Fixer-Upper': 'Priced to move fast for cash buyers',
+    };
+    if (typeUrgency[facts.propertyType]) {
+      triggers.push(typeUrgency[facts.propertyType]);
+    }
+  }
+  
+  // Feature-based urgency
+  if (facts.features && facts.features.length > 0) {
+    const hasDesirableFeature = facts.features.some(f => 
+      f.toLowerCase().includes('new') || 
+      f.toLowerCase().includes('updated') ||
+      f.toLowerCase().includes('renovated')
+    );
+    if (hasDesirableFeature) {
+      triggers.push('Turn-key homes in this condition get multiple offers');
+    }
+  }
+  
+  // Size-based urgency
+  if (facts.beds && parseInt(facts.beds) >= 4) {
+    triggers.push(`${facts.beds}-bedroom homes are rare in this market`);
+  }
+  
+  // Generic but effective urgency triggers
+  const genericTriggers = [
+    'Interest rates may not stay this favorable',
+    'Inventory remains limited in this price range',
+    'Similar properties have sold within days',
+    'Open house this weekend - offers reviewed Monday',
+    'Seller motivated for quick close',
+  ];
+  
+  // Fill up to 3 triggers
+  genericTriggers.forEach(trigger => {
+    if (triggers.length < 3) {
+      triggers.push(trigger);
+    }
+  });
+  
+  return triggers.slice(0, 3).map((t, i) => `  ${i + 1}. ${t}`);
+}
+
+// Generate social proof elements
+export function generateSocialProof(facts: Facts): string[] {
+  const proofElements: string[] = [];
+  
+  // Neighborhood-based social proof
+  if (facts.neighborhood) {
+    proofElements.push(`${facts.neighborhood} consistently ranks as a top neighborhood`);
+    proofElements.push(`Neighbors often stay for decades in ${facts.neighborhood}`);
+  }
+  
+  // Property type social proof
+  if (facts.propertyType) {
+    const typeProof: Record<string, string> = {
+      'Starter Home': 'Perfect for buyers who went on to build significant equity',
+      'Luxury Estate': 'Joining an exclusive community of discerning homeowners',
+      'Family Home': 'The type of home where kids return for holidays decades later',
+      'Investment Property': 'Similar properties showing strong rental history',
+    };
+    if (typeProof[facts.propertyType]) {
+      proofElements.push(typeProof[facts.propertyType]);
+    }
+  }
+  
+  // Generic social proof
+  const genericProof = [
+    'Experienced agent with deep knowledge of this market',
+    'Sellers chose us for our proven marketing approach',
+    'Our listings average multiple offers',
+    'Featured property generating significant interest',
+  ];
+  
+  genericProof.forEach(proof => {
+    if (proofElements.length < 3) {
+      proofElements.push(proof);
+    }
+  });
+  
+  return proofElements.slice(0, 3).map((p, i) => `  ${i + 1}. ${p}`);
+}
+
+// Build complete property context for no-photo scenarios
+export function buildPropertyContext(facts: Facts, controls: any): string {
+  const hooks = generateHooksFromSpecs(facts);
+  const headlineFeature = extractHeadlineFeature(facts);
+  const buyerProfile = inferBuyerFromPropertyType(facts.propertyType);
+  const lifestyleScenarios = generateLifestyleFromFeatures(facts.features || []);
+  const benefits = mapFeaturesToBenefits(facts.features || []);
+  const urgencyTriggers = generateUrgencyTriggers(facts);
+  const socialProof = generateSocialProof(facts);
+  
+  return [
+    '🏠 PROPERTY-BASED CONTENT GENERATION SYSTEM 🏠',
+    '',
+    'IMPORTANT: No photos provided - Generate compelling content from property facts',
+    '',
+    '🎯 PRIMARY CONVERSION GOAL: Turn readers into scheduled showings',
+    `🎭 TARGET BUYER: ${buyerProfile}`,
+    '',
+    '💡 CONVERSION HOOKS (use these angles):',
+    ...hooks.map((hook, i) => `  ${i + 1}. "${hook}"`),
+    '',
+    `🏆 HEADLINE FEATURE (MUST open MLS): "${headlineFeature}"`,
+    '',
+    '🎪 LIFESTYLE SCENARIOS (weave into content):',
+    ...lifestyleScenarios,
+    '',
+    '💎 BUYER BENEFITS (Feature → Emotional Benefit):',
+    ...benefits,
+    '',
+    '⚡ URGENCY TRIGGERS (create FOMO):',
+    ...urgencyTriggers,
+    '',
+    '🛡️ SOCIAL PROOF ELEMENTS (build credibility):',
+    ...socialProof,
+    '',
+    '📱 INSTAGRAM CONTENT STRATEGY (NO PHOTOS):',
+    '• Create text-based carousel slides that tell a story',
+    '• Slide 1: Hook with property stats (beds/baths/location)',
+    '• Slide 2-3: Feature highlights with benefit language',
+    '• Slide 4: Neighborhood and lifestyle appeal',
+    '• Slide 5: Availability, pricing, or urgency message',
+    '• Slide 6: Clear CTA (DM for details, schedule showing)',
+    '',
+    'INSTAGRAM EXAMPLES:',
+    `• Slide 1: "${facts.beds || '3'}BR/${facts.baths || '2'}BA in ${facts.neighborhood || 'Prime Location'} 📍"`,
+    `• Slide 2: "${headlineFeature} ✨"`,
+    '• Slide 3: "Walk to Everything That Matters 🚶‍♀️"',
+    '• Slide 4: "Your Morning Coffee Spot Awaits ☕"',
+    '• Slide 5: "Open House Saturday 11-1 🗓️"',
+    '• Slide 6: "DM \'TOUR\' for Private Showing 📩"',
+    '',
+    '🎥 REEL SCRIPT STRATEGY (NO PHOTOS):',
+    '• Create conceptual shots that don\'t require actual footage',
+    '• Use graphics, text overlays, maps, and agent-to-camera shots',
+    '',
+    'REEL SHOT ALTERNATIVES:',
+    '• Instead of "pan across living room" → "Property stats animation on screen"',
+    '• Instead of "close-up of kitchen" → "Feature list with checkmarks appearing"',
+    '• Instead of "exterior shot" → "Map zoom to neighborhood location"',
+    '• Instead of "room tour" → "Agent speaking with text overlays"',
+    '• Instead of "detail shots" → "Lifestyle graphics and icons"',
+    '',
+    'OUTPUT FORMAT - CRITICAL:',
+    'Generate EXACTLY 4 lines for reelScript, each on ONE LINE:',
+    '',
+    'EXAMPLE REEL STRUCTURE (MAINTAIN EXACT FORMAT):',
+    '[0-3s] VOICE: Hook about the property TEXT: Key stat SHOT: Agent to camera or stats graphic',
+    '[4-10s] VOICE: Three bedrooms, two baths in prime location TEXT: 3BR • 2BA • Prime area SHOT: Animated floor plan or map',
+    '[11-20s] VOICE: Chef kitchen, hardwood floors, and updated systems TEXT: Chef kitchen • Hardwood • Updated SHOT: Feature list animation',
+    '[21-30s] VOICE: Open house Saturday. Comment TOUR for details TEXT: Open Sat • DM TOUR SHOT: Agent with contact overlay',
+    '',
+    '📧 EMAIL STRATEGY (PROPERTY FACTS):',
+    '• Lead with strongest feature or stat',
+    '• Use specific details from provided facts',
+    '• Create urgency without photos',
+    '• Focus on benefits and lifestyle',
+    '',
+    '✅ CONTENT REQUIREMENTS:',
+    '• Generate ALL requested channels with substantial content',
+    '• DO NOT return empty arrays for Instagram or Reel',
+    '• Use property facts creatively to build engagement',
+    '• Focus on storytelling over visual description',
+    '• Create desire through benefits and lifestyle positioning',
+  ].join('\n');
+}
+*/

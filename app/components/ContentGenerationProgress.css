@@ -1,0 +1,450 @@
+/* Content Generation Progress Indicator Styles */
+
+.content-generation-progress {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 420px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px;
+  box-shadow: 
+    0 10px 40px rgba(0, 0, 0, 0.08),
+    0 2px 10px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 20px;
+  z-index: 9999;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .content-generation-progress {
+    background: rgba(30, 30, 30, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 
+      0 10px 40px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Minimized State */
+.content-generation-progress.minimized {
+  width: 60px;
+  height: 60px;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.minimized-view {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.progress-ring {
+  position: relative;
+  width: 50px;
+  height: 50px;
+}
+
+.progress-ring svg {
+  transform: scale(1);
+  transition: transform 0.2s;
+}
+
+.minimized-view:hover .progress-ring svg {
+  transform: scale(1.1);
+}
+
+.progress-ring .progress-emoji {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 20px;
+}
+
+/* Expanded State */
+.content-generation-progress.expanded {
+  width: 460px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+/* Header */
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.progress-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  letter-spacing: -0.02em;
+}
+
+@media (prefers-color-scheme: dark) {
+  .progress-header h3 {
+    color: #f3f4f6;
+  }
+}
+
+.progress-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.progress-controls button {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #6b7280;
+  transition: all 0.2s;
+}
+
+.progress-controls button:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+@media (prefers-color-scheme: dark) {
+  .progress-controls button {
+    background: rgba(55, 65, 81, 0.5);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #9ca3af;
+  }
+  
+  .progress-controls button:hover {
+    background: rgba(75, 85, 99, 0.5);
+    color: #f3f4f6;
+  }
+}
+
+/* Progress Bar */
+.progress-bar-container {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.progress-bar-background {
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 100px;
+  overflow: hidden;
+  position: relative;
+}
+
+@media (prefers-color-scheme: dark) {
+  .progress-bar-background {
+    background: rgba(55, 65, 81, 0.5);
+  }
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 100px;
+  position: relative;
+  transition: width 0.3s ease;
+}
+
+.progress-glow {
+  position: absolute;
+  top: -4px;
+  width: 40px;
+  height: 16px;
+  background: radial-gradient(ellipse at center, rgba(139, 92, 246, 0.4) 0%, transparent 70%);
+  filter: blur(8px);
+  transition: left 0.3s ease;
+  pointer-events: none;
+}
+
+.progress-percentage {
+  position: absolute;
+  right: 0;
+  top: -24px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+/* Stage Information */
+.stage-info {
+  margin-bottom: 16px;
+}
+
+.stage-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.stage-emoji {
+  font-size: 24px;
+  line-height: 1;
+  flex-shrink: 0;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.stage-text h4 {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  letter-spacing: -0.01em;
+}
+
+.stage-detail {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+@media (prefers-color-scheme: dark) {
+  .stage-text h4 {
+    color: #f3f4f6;
+  }
+  
+  .stage-detail {
+    color: #9ca3af;
+  }
+}
+
+/* Expanded Details */
+.expanded-details {
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  padding-top: 16px;
+  margin-top: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .expanded-details {
+    border-top-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+.stages-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.stage-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.stage-item.completed {
+  background: rgba(34, 197, 94, 0.1);
+  color: #15803d;
+}
+
+.stage-item.active {
+  background: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.stage-item.pending {
+  color: #9ca3af;
+  opacity: 0.7;
+}
+
+.stage-mini-emoji {
+  font-size: 14px;
+}
+
+.stage-name {
+  flex: 1;
+  font-size: 12px;
+}
+
+.checkmark {
+  color: #22c55e;
+  font-weight: bold;
+}
+
+/* Contextual Message */
+.contextual-message {
+  padding: 12px;
+  background: rgba(59, 130, 246, 0.05);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.contextual-message p {
+  margin: 0;
+  font-size: 13px;
+  color: #1d4ed8;
+  font-style: italic;
+}
+
+@media (prefers-color-scheme: dark) {
+  .contextual-message {
+    background: rgba(59, 130, 246, 0.1);
+  }
+  
+  .contextual-message p {
+    color: #60a5fa;
+  }
+}
+
+/* Fun Fact */
+.fun-fact {
+  padding: 10px 12px;
+  background: linear-gradient(135deg, rgba(251, 207, 232, 0.1), rgba(219, 234, 254, 0.1));
+  border-radius: 8px;
+  border-left: 3px solid #8b5cf6;
+}
+
+.fun-fact p {
+  margin: 0;
+  font-size: 12px;
+  color: #4c1d95;
+  line-height: 1.4;
+}
+
+@media (prefers-color-scheme: dark) {
+  .fun-fact {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1));
+  }
+  
+  .fun-fact p {
+    color: #c4b5fd;
+  }
+}
+
+/* Completion Message */
+.completion-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(134, 239, 172, 0.1));
+  border-radius: 8px;
+  margin-top: 12px;
+}
+
+.success-emoji {
+  font-size: 24px;
+  animation: celebrate 0.5s ease-out;
+}
+
+@keyframes celebrate {
+  0% { transform: scale(0) rotate(0deg); }
+  50% { transform: scale(1.2) rotate(180deg); }
+  100% { transform: scale(1) rotate(360deg); }
+}
+
+.completion-message p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #15803d;
+}
+
+@media (prefers-color-scheme: dark) {
+  .completion-message {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(134, 239, 172, 0.1));
+  }
+  
+  .completion-message p {
+    color: #86efac;
+  }
+}
+
+/* Mobile Responsive */
+@media (max-width: 640px) {
+  .content-generation-progress {
+    width: calc(100% - 32px);
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+  }
+  
+  .content-generation-progress.expanded {
+    width: calc(100% - 32px);
+  }
+  
+  .stages-overview {
+    display: none;
+  }
+  
+  .expanded-details {
+    padding-top: 12px;
+  }
+  
+  .fun-fact {
+    display: none;
+  }
+}
+
+/* Smooth scrollbar for expanded view */
+.content-generation-progress.expanded::-webkit-scrollbar {
+  width: 6px;
+}
+
+.content-generation-progress.expanded::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.content-generation-progress.expanded::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.content-generation-progress.expanded::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  .content-generation-progress.expanded::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  
+  .content-generation-progress.expanded::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}

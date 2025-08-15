@@ -1,0 +1,109 @@
+/* Z-index layering system for consistent overlay management */
+.featureLockContainer {
+  position: relative;
+  isolation: isolate;
+}
+
+.featureLockOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.featureLockModal {
+  /* Enhanced backdrop blur support for better browser compatibility */
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  
+  /* Smooth animations for modal appearance */
+  animation: fadeInUp 0.3s ease-out;
+  transform-origin: center center;
+}
+
+.featureLockButton {
+  /* Enhanced button interactions with better accessibility */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+}
+
+.featureLockButton:focus-visible {
+  outline: 2px solid #06b6d4;
+  outline-offset: 2px;
+}
+
+.featureLockButton:active {
+  transform: scale(0.98);
+}
+
+.lockedContent {
+  /* Better visual indication of locked state */
+  filter: grayscale(0.3) blur(0.5px);
+  transition: filter 0.2s ease;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.pulseAnimation {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .featureLockOverlay {
+    background: rgba(0, 0, 0, 0.95);
+  }
+  
+  .featureLockModal {
+    border: 2px solid white;
+    background: rgba(0, 0, 0, 0.98);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .featureLockModal {
+    animation: none;
+  }
+  
+  .featureLockButton {
+    transition: none;
+  }
+  
+  .pulseAnimation {
+    animation: none;
+  }
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 640px) {
+  .featureLockModal {
+    margin: 1rem;
+    padding: 1.5rem;
+  }
+  
+  .featureLockButton {
+    padding: 1rem 1.5rem;
+    font-size: 0.875rem;
+  }
+}

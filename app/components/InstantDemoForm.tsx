@@ -2,7 +2,10 @@
 import React from 'react';
 import { Image as ImageIcon, Crown, Lock } from 'lucide-react';
 import { canUseFeature } from '@/lib/tiers';
-import FeatureLock from './FeatureLock';
+import ChannelSelector from './ChannelSelector';
+import PresetSelector from './PresetSelector';
+import AdvancedSettings from './AdvancedSettings';
+import PhotoUploadWithPreview from './PhotoUploadWithPreview';
 
 type InstantDemoFormProps = {
   address: string;
@@ -61,10 +64,16 @@ type InstantDemoFormProps = {
   setAvoidWords: (v: string) => void;
   onGenerate: () => void;
   onUseSample: () => void;
+  onApplyPreset?: (preset: 'starter' | 'luxury' | 'investor' | 'condo' | 'family' | 'fixer') => void;
   isGenerating?: boolean;
   generationStage?: 'uploading' | 'analyzing' | 'selecting' | 'generating' | 'complete';
   userTier?: string;
   onUpgrade?: (tier: string) => void;
+  onBlockedAttempt?: (feature: string) => void;
+  freeKitsUsed?: number;
+  freeLimit?: number;
+  isLoggedIn?: boolean;
+  buttonState?: { enabled: boolean; text: string; requiresAuth: boolean };
 };
 
 function LabeledInput({ label, value, onChange, type = "text", placeholder }:{label:string; value:string; onChange:(v:string)=>void; type?:string; placeholder?:string;}){
@@ -153,7 +162,7 @@ export default function InstantDemoForm(props: InstantDemoFormProps){
     mlsFormat, setMlsFormat,
     mustInclude, setMustInclude,
     avoidWords, setAvoidWords,
-    onGenerate, onUseSample,
+    onGenerate, onUseSample, onApplyPreset,
     isGenerating,
   } = props;
 
@@ -168,60 +177,21 @@ export default function InstantDemoForm(props: InstantDemoFormProps){
         <LabeledInput label="Key features (comma-separated)" value={features} onChange={setFeatures} placeholder="Chef's kitchen, Wide-plank floors, EV garage" />
       </div>
 
+      {/* Smart Defaults Selector */}
+      {onApplyPreset && (
+        <div className="mt-6">
+          <PresetSelector onSelectPreset={onApplyPreset} />
+        </div>
+      )}
+
       <div className="mt-4">
-        <FeatureLock
-          feature="vision"
-          currentTier={props.userTier || 'FREE'}
-          title="AI Photo Analysis"
-          description="Upload property photos for enhanced AI analysis and smart content generation"
+        <PhotoUploadWithPreview
+          photos={photos}
+          setPhotos={setPhotos}
+          userTier={props.userTier || 'FREE'}
           onUpgrade={props.onUpgrade}
-        >
-          <label className="block">
-            <div className="text-sm text-white/80 mb-2">
-              <ImageIcon className="h-4 w-4 inline mr-2" />
-              Photos (for enhanced AI analysis)
-              {!canUseFeature(props.userTier || 'FREE', 'vision') && (
-                <Lock className="h-4 w-4 inline ml-2 text-yellow-400" />
-              )}
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-neutral-950/50 p-4">
-              <input
-                aria-label="Upload photos"
-                type="file"
-                multiple
-                accept="image/*"
-                onChange={(e) => props.setPhotos(Array.from(e.target.files || []))}
-                className="block w-full text-sm file:mr-3 file:rounded-xl file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-neutral-900 hover:file:opacity-90"
-                disabled={!canUseFeature(props.userTier || 'FREE', 'vision')}
-              />
-              {photos?.length && canUseFeature(props.userTier || 'FREE', 'vision') ? (
-                <div className="mt-3 space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-white/80">
-                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-500/20 text-green-400 text-xs">
-                      ✓
-                    </span>
-                    {photos.length} photo{photos.length > 1 ? 's' : ''} ready for AI analysis
-                  </div>
-                  <div className="text-xs text-white/60">
-                    AI will analyze your photos to create enhanced descriptions that highlight your property&apos;s best features
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-3 text-xs text-white/60">
-                  <div className="mb-1">💡 Pro tip: Include these photos for best AI results:</div>
-                  <div className="grid grid-cols-2 gap-1 text-white/50">
-                    <span>• Front exterior</span>
-                    <span>• Kitchen</span>
-                    <span>• Living room</span>
-                    <span>• Master bedroom</span>
-                    <span>• Best feature (pool, view, etc.)</span>
-                    <span>• Any unique selling points</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </label>
-        </FeatureLock>
+          onBlockedAttempt={props.onBlockedAttempt}
+        />
       </div>
 
       <div className="mt-6 grid md:grid-cols-2 gap-6">
@@ -230,117 +200,51 @@ export default function InstantDemoForm(props: InstantDemoFormProps){
       </div>
 
       <div className="mt-6">
-        <div className="text-sm text-white/80">Channels</div>
-        <div className="mt-2 flex flex-wrap gap-4">
-          {['mls', 'instagram', 'reel', 'email'].map((ch) => (
-            <label key={ch} className="inline-flex items-center gap-2 text-sm text-white/80">
-              <input
-                type="checkbox"
-                checked={channels.includes(ch)}
-                onChange={(e) =>
-                  setChannels(
-                    e.target.checked
-                      ? [...channels, ch]
-                      : channels.filter((c) => c !== ch)
-                  )
-                }
-                className="rounded border-white/10 bg-neutral-950"
-              />
-              {ch === 'mls' ? 'MLS' : ch === 'instagram' ? 'Instagram' : ch === 'reel' ? 'Reel' : 'Email'}
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <label className="text-sm text-white/80">Brand voice (paste a past listing — optional)</label>
-        <textarea
-          value={brandVoice}
-          onChange={(e) => setBrandVoice(e.target.value)}
-          rows={3}
-          placeholder="E.g., 'Calm, confident tone. Short sentences. Avoid jargon.'"
-          className="mt-2 w-full rounded-2xl bg-neutral-950 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-cyan-400/60"
+        <ChannelSelector
+          selected={channels}
+          onChange={setChannels}
+          userTier={props.userTier}
+          freeKitsUsed={props.freeKitsUsed}
+          freeLimit={props.freeLimit}
+          onBlockedAttempt={props.onBlockedAttempt}
         />
       </div>
 
-      <div className="mt-6 grid sm:grid-cols-3 gap-4">
-        <LabeledInput label="Open house date" type="date" value={openHouseDate} onChange={setOpenHouseDate} />
-        <LabeledInput label="Open house time" value={openHouseTime} onChange={setOpenHouseTime} placeholder="11–1" />
-        <LabeledInput label="RSVP link" value={openHouseLink} onChange={setOpenHouseLink} placeholder="https://…" />
-      </div>
-
-      <div className="mt-6 grid sm:grid-cols-3 gap-4">
-        <label className="block">
-          <div className="text-sm text-white/80">CTA type</div>
-          <select
-            value={ctaType}
-            onChange={(e) => setCtaType(e.target.value)}
-            className="mt-2 w-full rounded-2xl bg-neutral-950 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-cyan-400/60"
-          >
-            <option value="">None</option>
-            <option value="phone">Phone</option>
-            <option value="link">Link</option>
-            <option value="custom">Custom</option>
-          </select>
-        </label>
-        {ctaType === 'phone' && (
-          <LabeledInput label="Phone" value={ctaPhone} onChange={setCtaPhone} placeholder="555-1234" />
-        )}
-        {ctaType === 'link' && (
-          <LabeledInput label="Link" value={ctaLink} onChange={setCtaLink} placeholder="https://…" />
-        )}
-        {ctaType === 'custom' && (
-          <LabeledInput label="Custom text" value={ctaCustom} onChange={setCtaCustom} placeholder="Call me for details" />
-        )}
-      </div>
-
-      <div className="mt-6 grid sm:grid-cols-3 gap-4">
-        <LabeledInput label="Social handle" value={socialHandle} onChange={setSocialHandle} placeholder="@handle" />
-        <LabeledInput label="Hashtag strategy" value={hashtagStrategy} onChange={setHashtagStrategy} placeholder="local + trending" />
-        <LabeledInput label="Extra hashtags" value={extraHashtags} onChange={setExtraHashtags} placeholder="#homes, #realestate" />
-      </div>
-
-      <div className="mt-6 grid sm:grid-cols-3 gap-4">
-        <LabeledInput label="Reading level" value={readingLevel} onChange={setReadingLevel} placeholder="8th grade" />
-        <label className="flex items-center gap-2 text-sm text-white/80 mt-6 sm:mt-0">
-          <input type="checkbox" checked={useEmojis} onChange={(e) => setUseEmojis(e.target.checked)} className="rounded border-white/10 bg-neutral-950" />
-          Use emojis
-        </label>
-        <label className="block">
-          <div className="text-sm text-white/80">MLS format</div>
-          <select
-            value={mlsFormat}
-            onChange={(e) => setMlsFormat(e.target.value)}
-            className="mt-2 w-full rounded-2xl bg-neutral-950 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-cyan-400/60"
-          >
-            <option value="paragraph">Paragraph</option>
-            <option value="bullets">Bullets</option>
-          </select>
-        </label>
-      </div>
-
-      <div className="mt-6 grid sm:grid-cols-2 gap-4">
-        <label className="block">
-          <div className="text-sm text-white/80">Must include</div>
-          <textarea
-            value={mustInclude}
-            onChange={(e) => setMustInclude(e.target.value)}
-            rows={3}
-            placeholder="e.g., pool, views"
-            className="mt-2 w-full rounded-2xl bg-neutral-950 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-cyan-400/60"
-          />
-        </label>
-        <label className="block">
-          <div className="text-sm text-white/80">Avoid words</div>
-          <textarea
-            value={avoidWords}
-            onChange={(e) => setAvoidWords(e.target.value)}
-            rows={3}
-            placeholder="e.g., fixer-upper, noisy"
-            className="mt-2 w-full rounded-2xl bg-neutral-950 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-cyan-400/60"
-          />
-        </label>
-      </div>
+      {/* Advanced Settings - All optional fields in collapsible sections */}
+      <AdvancedSettings
+        openHouseDate={openHouseDate}
+        setOpenHouseDate={setOpenHouseDate}
+        openHouseTime={openHouseTime}
+        setOpenHouseTime={setOpenHouseTime}
+        openHouseLink={openHouseLink}
+        setOpenHouseLink={setOpenHouseLink}
+        ctaType={ctaType}
+        setCtaType={setCtaType}
+        ctaPhone={ctaPhone}
+        setCtaPhone={setCtaPhone}
+        ctaLink={ctaLink}
+        setCtaLink={setCtaLink}
+        ctaCustom={ctaCustom}
+        setCtaCustom={setCtaCustom}
+        socialHandle={socialHandle}
+        setSocialHandle={setSocialHandle}
+        hashtagStrategy={hashtagStrategy}
+        setHashtagStrategy={setHashtagStrategy}
+        extraHashtags={extraHashtags}
+        setExtraHashtags={setExtraHashtags}
+        readingLevel={readingLevel}
+        setReadingLevel={setReadingLevel}
+        useEmojis={useEmojis}
+        setUseEmojis={setUseEmojis}
+        mlsFormat={mlsFormat}
+        setMlsFormat={setMlsFormat}
+        mustInclude={mustInclude}
+        setMustInclude={setMustInclude}
+        avoidWords={avoidWords}
+        setAvoidWords={setAvoidWords}
+        brandVoice={brandVoice}
+        setBrandVoice={setBrandVoice}
+      />
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <button onClick={onGenerate} disabled={!!isGenerating} className={
@@ -355,7 +259,7 @@ export default function InstantDemoForm(props: InstantDemoFormProps){
               <div className="h-4 w-4 border-2 border-neutral-900/30 border-t-neutral-900 rounded-full animate-spin"></div>
               {getGenerationMessage(props.generationStage)}
             </div>
-          ) : 'Generate from these details'}
+          ) : (props.buttonState?.text || 'Generate from these details')}
         </button>
         <button onClick={onUseSample} disabled={isGenerating} className="text-white/80 hover:text-white underline underline-offset-4 disabled:opacity-50">
           Use a sample listing instead
