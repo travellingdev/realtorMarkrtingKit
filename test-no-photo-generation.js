@@ -21,7 +21,7 @@ async function testNoPhotoGeneration() {
   };
 
   const controls = {
-    channels: ['mls', 'instagram', 'email'],
+    channels: ['mls', 'instagram', 'reel', 'email'],
     openHouseDate: "Saturday, November 16th",
     openHouseTime: "1:00 PM - 3:00 PM",
     ctaType: "phone",
@@ -33,7 +33,7 @@ async function testNoPhotoGeneration() {
   try {
     console.log('📝 Sending request to /api/generate...');
     
-    const response = await fetch('http://localhost:3005/api/generate', {
+    const response = await fetch('http://localhost:3006/api/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -99,6 +99,34 @@ async function testNoPhotoGeneration() {
         console.log('\n❌ No Instagram content generated');
       }
 
+      // Check Reel content
+      if (result.outputs.reelScript && result.outputs.reelScript.length > 0) {
+        console.log('\n🎬 REEL SCRIPT:');
+        console.log('Segments:', result.outputs.reelScript.length);
+        result.outputs.reelScript.forEach((segment, i) => {
+          if (typeof segment === 'object' && segment.voice) {
+            console.log(`  ${i + 1}. [${segment.time}] Voice: ${segment.voice.substring(0, 60)}...`);
+            console.log(`      Text: ${segment.text}`);
+            console.log(`      Shot: ${segment.shot.substring(0, 60)}...`);
+          } else {
+            console.log(`  ${i + 1}. ${String(segment).substring(0, 100)}...`);
+          }
+        });
+        
+        // Check reel structure
+        const hasProperStructure = result.outputs.reelScript.length === 4;
+        const hasObjectFormat = typeof result.outputs.reelScript[0] === 'object';
+        const allSegmentsComplete = result.outputs.reelScript.every(seg => 
+          typeof seg === 'object' && seg.voice && seg.text && seg.shot
+        );
+        
+        console.log('✓ 4 segments:', hasProperStructure ? '✅' : '❌');
+        console.log('✓ Object format:', hasObjectFormat ? '✅' : '❌');
+        console.log('✓ Complete segments:', allSegmentsComplete ? '✅' : '❌');
+      } else {
+        console.log('\n❌ No reel content generated');
+      }
+
       // Check Email content
       if (result.outputs.emailSubject && result.outputs.emailBody) {
         console.log('\n📧 EMAIL CONTENT:');
@@ -136,15 +164,17 @@ async function testNoPhotoGeneration() {
 
       console.log('\n🎯 OVERALL ASSESSMENT:');
       const hasRichContent = result.outputs.mlsDesc?.length > 200;
-      const hasMultipleChannels = [result.outputs.mlsDesc, result.outputs.igSlides?.length, result.outputs.emailBody].filter(Boolean).length >= 2;
+      const hasMultipleChannels = [result.outputs.mlsDesc, result.outputs.igSlides?.length, result.outputs.reelScript?.length, result.outputs.emailBody].filter(Boolean).length >= 3;
       const hasPropertyInsights = result.photo_insights?.conversionHooks?.length > 0;
+      const hasReelContent = result.outputs.reelScript?.length === 4;
       
       console.log('✓ Rich content (>200 chars):', hasRichContent ? '✅' : '❌');
-      console.log('✓ Multiple channels:', hasMultipleChannels ? '✅' : '❌');
+      console.log('✓ Multiple channels (3+):', hasMultipleChannels ? '✅' : '❌');
       console.log('✓ Property-based psychology:', hasPropertyInsights ? '✅' : '❌');
+      console.log('✓ Reel script generated:', hasReelContent ? '✅' : '❌');
       
-      if (hasRichContent && hasMultipleChannels && hasPropertyInsights) {
-        console.log('\n🎉 SUCCESS: Enhanced no-photo generation is working!');
+      if (hasRichContent && hasMultipleChannels && hasPropertyInsights && hasReelContent) {
+        console.log('\n🎉 SUCCESS: Enhanced no-photo generation is working including reels!');
       } else {
         console.log('\n⚠️  ISSUES: Some aspects of no-photo generation need improvement');
       }

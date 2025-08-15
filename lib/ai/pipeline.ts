@@ -1175,10 +1175,19 @@ export async function generateKit({
     // Debug logging for reel script after critique
     if (parsed.reelScript && parsed.reelScript.length > 0) {
       console.log('🎬 [REEL CRITIQUE DEBUG] After critique reelScript:');
-      parsed.reelScript.forEach((line, i) => {
-        console.log(`  [${i}]:`, line.substring(0, 150) + (line.length > 150 ? '...' : ''));
-        if (!line.includes('SHOT:')) {
-          console.log('    ⚠️ WARNING: No SHOT after critique');
+      parsed.reelScript.forEach((segment, i) => {
+        if (typeof segment === 'object' && segment.voice) {
+          console.log(`  [${i}]: Object format - time: ${segment.time}, voice: ${segment.voice?.substring(0, 50)}..., text: ${segment.text}, shot: ${segment.shot}`);
+          if (!segment.shot) {
+            console.log('    ⚠️ WARNING: No shot in object segment after critique');
+          }
+        } else if (typeof segment === 'string') {
+          console.log(`  [${i}]: String format -`, segment.substring(0, 150) + (segment.length > 150 ? '...' : ''));
+          if (!segment.includes('SHOT:')) {
+            console.log('    ⚠️ WARNING: No SHOT after critique');
+          }
+        } else {
+          console.log(`  [${i}]: Unexpected format -`, typeof segment, segment);
         }
       });
     }
