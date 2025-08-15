@@ -156,7 +156,7 @@ function analyzePropertyCharacteristics(facts: Facts): PropertyAnalysis {
   const emotionalTriggers = generateEmotionalTriggers(propertyCategory, features, facts);
 
   // Generate lifestyle elements
-  const lifestyleElements = generateLifestyleElements(propertyCategory, features, beds, baths);
+  const lifestyleElements = generateLifestyleElements(propertyCategory, features, facts.beds, facts.baths);
 
   // Calculate appeal score
   let appealScore = 5; // Base score
