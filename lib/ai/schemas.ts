@@ -12,6 +12,7 @@ export const FactsSchema = z.object({
   propertyType: z.string().optional(),
   tone: z.string().optional(),
   brandVoice: z.string().optional(),
+  summary: z.string().optional(),
 });
 export type Facts = z.infer<typeof FactsSchema>;
 
