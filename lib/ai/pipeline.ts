@@ -37,6 +37,146 @@ export function buildFacts(payload: Payload): Facts {
   return FactsSchema.parse(raw);
 }
 
+// Validation function for email structure
+function validateEmailStructure(email: any): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  if (!email) {
+    errors.push('No email structure provided');
+    return { valid: false, errors };
+  }
+  
+  // Check required fields
+  if (!email.subject || email.subject.length < 10) {
+    errors.push('Email subject missing or too short (min 10 chars)');
+  }
+  if (email.subject && email.subject.length > 60) {
+    errors.push('Email subject too long (max 60 chars)');
+  }
+  
+  if (!email.hook || email.hook.length < 10) {
+    errors.push('Email hook missing or too short');
+  }
+  
+  if (!email.valuePoints || !Array.isArray(email.valuePoints)) {
+    errors.push('Email valuePoints missing or not an array');
+  } else if (email.valuePoints.length !== 3) {
+    errors.push(`Email must have exactly 3 value points (got ${email.valuePoints.length})`);
+  }
+  
+  if (!email.urgency || email.urgency.length < 5) {
+    errors.push('Email urgency missing or too short');
+  }
+  
+  if (!email.ctaPrimary || email.ctaPrimary.length < 3) {
+    errors.push('Email primary CTA missing or too short');
+  }
+  
+  return { valid: errors.length === 0, errors };
+}
+
+// Helper function to build bulletproof email prompt
+function buildBulletproofEmailPrompt(
+  facts: Facts,
+  controls: Controls,
+  photoInsights?: PhotoInsights
+): string {
+  // Check what data we have
+  const hasPhotos = photoInsights?.rooms?.length > 0;
+  // Price is not in Facts type, so we check for it in a different way
+  const hasPrice = false; // Price would come from payload/controls if available
+  const hasAddress = !!facts.address;
+  const hasNeighborhood = !!facts.neighborhood;
+  const hasBedsBaths = !!(facts.beds && facts.baths);
+  const hasFeatures = facts.features?.length > 0;
+  const hasOpenHouse = !!(controls.openHouseDate);
+  
+  // Calculate data completeness
+  const dataPoints = [hasAddress, hasNeighborhood, hasBedsBaths, hasFeatures, hasPhotos].filter(Boolean).length;
+  const completeness = (dataPoints / 5) * 100;
+  
+  return `
+CRITICAL EMAIL REQUIREMENTS:
+
+Create a real estate email that makes buyers want to see this property.
+
+AVAILABLE INFORMATION:
+${hasAddress ? `✓ Address: ${facts.address}` : '✗ No address provided'}
+${hasNeighborhood ? `✓ Neighborhood: ${facts.neighborhood}` : '✗ No neighborhood info'}
+${hasBedsBaths ? `✓ Beds/Baths: ${facts.beds}BR/${facts.baths}BA` : '✗ No bed/bath count'}
+${hasFeatures ? `✓ Features: ${facts.features.slice(0, 3).join(', ')}` : '✗ No features listed'}
+${hasPhotos ? `✓ Photos analyzed: ${photoInsights.rooms.length} rooms visible` : '✗ No photos available'}
+${hasOpenHouse ? `✓ Open House: ${controls.openHouseDate}` : '✗ No open house scheduled'}
+
+DATA COMPLETENESS: ${completeness}% - ${completeness > 60 ? 'Rich content mode' : completeness > 30 ? 'Balanced mode' : 'Discovery mode'}
+
+YOUR EMAIL MUST HAVE EXACTLY THESE 8 PARTS:
+
+1. SUBJECT: Include the BEST detail you have + address/area (60 chars max)
+   ${hasPhotos && photoInsights.headlineFeature 
+     ? `Use: "${photoInsights.headlineFeature}" as hook`
+     : hasFeatures 
+       ? `Lead with: "${facts.features[0]}"`
+       : hasAddress
+         ? `Use: "New Opportunity at ${facts.address}"`
+         : 'Use: "Exclusive Property Opportunity"'}
+
+2. GREETING: "Hi there" (or "Hi [Name]" if available)
+
+3. HOOK: First sentence that creates desire (choose based on what you have):
+   ${hasPhotos && photoInsights.conversionHooks?.[0]
+     ? `Use: "${photoInsights.conversionHooks[0]}"`
+     : hasFeatures
+       ? 'Connect main feature to buyer need'
+       : 'Create intrigue: "I\'ve found something special for you"'}
+
+4. THREE VALUE POINTS: Always provide exactly 3 (prioritize in this order):
+   ${hasPhotos && photoInsights.mustMentionFeatures?.length > 0
+     ? `Primary: ${photoInsights.mustMentionFeatures.slice(0, 3).join(', ')}`
+     : hasFeatures
+       ? `Use: ${facts.features.slice(0, 3).join(', ')}`
+       : 'Use universal appeals: space, location, value'}
+
+5. URGENCY: Why act now (pick most relevant):
+   ${hasOpenHouse
+     ? `"Open house ${controls.openHouseDate} - Register for your time"`
+     : hasPhotos && photoInsights.urgencyTriggers?.[0]
+       ? `"${photoInsights.urgencyTriggers[0]}"`
+       : '"Schedule your private showing this week"'}
+
+6. PRIMARY CTA:
+   ${completeness > 60
+     ? '"Schedule Your Private Tour"'
+     : completeness > 30
+       ? '"View Details & Photos"'
+       : '"Get Full Property Details"'}
+
+7. SECONDARY CTA: "Reply with questions"
+
+8. SIGNATURE: "Best regards,\\n[Your Realtor Name]"
+
+${hasPhotos ? `
+PHOTO REFERENCES:
+- Mention "stunning photos" or "as you'll see in the photos"
+- Reference specific rooms: ${photoInsights.rooms.map(r => r.type).slice(0, 3).join(', ')}
+` : `
+NO PHOTOS - USE IMAGINATION:
+- "Picture yourself..."
+- "Imagine coming home to..."
+- "Discover the possibilities..."
+`}
+
+FALLBACK PHRASES (use when data is missing):
+- "Thoughtfully designed spaces"
+- "Pride of ownership evident throughout"
+- "Competitively priced for the area"
+- "Rare opportunity in desirable location"
+- "Move-in ready condition"
+
+IMPORTANT: Generate a complete email even with minimal information. Never skip sections.
+Use what you have, infer what you can, and use smart defaults for the rest.`;
+}
+
 function composeDraftMessages(facts: Facts, controls: Controls, photoInsights?: PhotoInsights): ChatMessage[] {
   // Map UI channel names to output field names
   const channelMapping: Record<string, string[]> = {
@@ -401,6 +541,9 @@ function composeDraftMessages(facts: Facts, controls: Controls, photoInsights?: 
     ? 'For "shot" field: Use specific camera movements like "Pan across living room", "Close-up of kitchen island", "Exterior establishing shot"'
     : 'For "shot" field: Use conceptual visuals like "Property stats animation", "Map zoom to neighborhood", "Agent speaking to camera", "Feature list graphic"';
 
+  // Build bulletproof email prompt
+  const emailPrompt = buildBulletproofEmailPrompt(facts, controls, photoInsights);
+  
   const userPrompt = [
     `Property Facts: ${JSON.stringify(facts)}`,
     '',
@@ -453,6 +596,16 @@ function composeDraftMessages(facts: Facts, controls: Controls, photoInsights?: 
     '  "reelHooks": string[]  // 3 alternative opening hooks',
     '  "emailSubject": string  // Email subject line (60 chars max)',
     '  "emailBody": string  // COMPLETE email with greeting and signature',
+    '  "emailStructured": {  // NEW: Structured email for consistency',
+    '    "subject": string  // 10-60 chars, include best detail + address',
+    '    "greeting": string  // "Hi there" or "Hi [Name]"',
+    '    "hook": string  // 10-200 chars, creates desire',
+    '    "valuePoints": [string, string, string]  // EXACTLY 3 value points',
+    '    "urgency": string  // 5-150 chars, authentic reason to act',
+    '    "ctaPrimary": string  // 3-50 chars, main action',
+    '    "ctaSecondary": string  // Secondary CTA, usually "Reply with questions"',
+    '    "signature": string  // Professional closing',
+    '  }',
     '}',
     '',
     'CRITICAL REEL REQUIREMENTS:',
@@ -462,6 +615,8 @@ function composeDraftMessages(facts: Facts, controls: Controls, photoInsights?: 
     '• time values MUST be: "[0-3s]", "[4-10s]", "[11-20s]", "[21-30s]"',
     '• text field is ON-SCREEN TEXT (like captions), keep it SHORT',
     shotInstructions,
+    '',
+    emailPrompt,
     '',
     'Set any non-requested channel outputs to empty string/array.'
   ].filter(Boolean).join('\n');
@@ -702,14 +857,52 @@ function postProcess(o: Output, facts?: Facts, photoInsights?: PhotoInsights): O
   }
   processedReelScript = processedReelScript.slice(0, 4);
 
+  // Process structured email if available
+  let finalEmailSubject = o.emailSubject || '';
+  let finalEmailBody = o.emailBody || '';
+  
+  if (o.emailStructured) {
+    console.log('📧 [EMAIL STRUCTURE DEBUG] Processing structured email format');
+    const structured = o.emailStructured;
+    
+    // Build email from structured format
+    finalEmailSubject = structured.subject || o.emailSubject || '';
+    
+    // Construct email body from structured parts
+    const bodyParts = [
+      structured.greeting || 'Hi there',
+      '',
+      structured.hook || '',
+      '',
+      ...(structured.valuePoints || []).map(point => `• ${point}`),
+      '',
+      structured.urgency || '',
+      '',
+      structured.ctaPrimary || 'Schedule your private tour',
+      structured.ctaSecondary ? `\nOr ${structured.ctaSecondary}` : '',
+      '',
+      structured.signature || 'Best regards,\n[Your Realtor Name]'
+    ].filter(part => part !== undefined);
+    
+    finalEmailBody = bodyParts.join('\n').trim();
+    
+    console.log('📧 [EMAIL STRUCTURE DEBUG] Structured email processed:', {
+      hasSubject: !!structured.subject,
+      hasHook: !!structured.hook,
+      valuePointCount: structured.valuePoints?.length || 0,
+      hasUrgency: !!structured.urgency,
+      hasCTA: !!structured.ctaPrimary
+    });
+  }
+  
   return {
     mlsDesc: trim(cap(o.mlsDesc || '', 900)),
     igSlides: (o.igSlides || []).map((s) => trim(cap(s, 110))).slice(0, 7),
     igHashtags: igHashtags,
     reelScript: processedReelScript,
     reelHooks: (o.reelHooks || []).map((s) => trim(cap(s, 150))).slice(0, 3),
-    emailSubject: trim(cap(o.emailSubject || '', 70)),
-    emailBody: trim(cap(o.emailBody || '', 900)),
+    emailSubject: trim(cap(finalEmailSubject, 70)),
+    emailBody: trim(cap(finalEmailBody, 900)),
   };
 }
 

@@ -51,6 +51,19 @@ export const ReelSegmentSchema = z.object({
 });
 export type ReelSegment = z.infer<typeof ReelSegmentSchema>;
 
+// Email structure for consistent generation
+export const EmailStructureSchema = z.object({
+  subject: z.string().min(10).max(60),
+  greeting: z.string().default('Hi there'),
+  hook: z.string().min(10).max(200),
+  valuePoints: z.array(z.string()).length(3),
+  urgency: z.string().min(5).max(150),
+  ctaPrimary: z.string().min(3).max(50),
+  ctaSecondary: z.string().default('Reply with questions'),
+  signature: z.string()
+});
+export type EmailStructure = z.infer<typeof EmailStructureSchema>;
+
 // Expected marketing outputs from the model.
 export const OutputSchema = z.object({
   mlsDesc: z.string().default(''),
@@ -72,6 +85,7 @@ export const OutputSchema = z.object({
   reelHooks: z.array(z.string()).default([]), // Alternative hooks for A/B testing
   emailSubject: z.string().default(''),
   emailBody: z.string().default(''),
+  emailStructured: EmailStructureSchema.optional(), // New structured email format
 });
 export type Output = z.infer<typeof OutputSchema>;
 
@@ -133,6 +147,56 @@ export const OutputJsonSchema = {
     reelHooks: { type: 'array', items: { type: 'string' } },
     emailSubject: { type: 'string' },
     emailBody: { type: 'string' },
+    emailStructured: {
+      type: 'object',
+      properties: {
+        subject: { 
+          type: 'string',
+          minLength: 10,
+          maxLength: 60,
+          description: 'Email subject line with best available detail'
+        },
+        greeting: { 
+          type: 'string',
+          description: 'Email greeting - Hi there or Hi [Name]'
+        },
+        hook: { 
+          type: 'string',
+          minLength: 10,
+          maxLength: 200,
+          description: 'Opening sentence that creates desire'
+        },
+        valuePoints: { 
+          type: 'array',
+          items: { type: 'string' },
+          minItems: 3,
+          maxItems: 3,
+          description: 'Exactly 3 value points about the property'
+        },
+        urgency: { 
+          type: 'string',
+          minLength: 5,
+          maxLength: 150,
+          description: 'Authentic reason to act now'
+        },
+        ctaPrimary: { 
+          type: 'string',
+          minLength: 3,
+          maxLength: 50,
+          description: 'Primary call to action'
+        },
+        ctaSecondary: { 
+          type: 'string',
+          description: 'Secondary CTA - usually Reply with questions'
+        },
+        signature: { 
+          type: 'string',
+          description: 'Professional email signature'
+        }
+      },
+      required: ['subject', 'greeting', 'hook', 'valuePoints', 'urgency', 'ctaPrimary', 'ctaSecondary', 'signature'],
+      additionalProperties: false
+    }
   },
   required: ['mlsDesc', 'igSlides', 'reelScript', 'emailSubject', 'emailBody'],
   additionalProperties: false,
