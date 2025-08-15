@@ -73,13 +73,27 @@ export function generateOutputs(
           }`,
         ]
       : [],
-    reelScript: include('reels')
+    reelScript: include('reel')
       ? [
-          `Hook: If natural light matters to you, watch this.`,
-          `Middle: ${payload.beds || '?'} bd/${payload.baths || '?'} ba${
-            payload.sqft ? `, ${payload.sqft} sq ft` : ''
-          }.`,
-          `CTA: See more at ${addr}.`,
+          {
+            shot: 'Front exterior with quick zoom-in',
+            text: 'If natural light matters to you, watch this.',
+            voice: 'If natural light matters to you, watch this.',
+          },
+          {
+            shot: 'Walk through the living area and kitchen',
+            text: `${payload.beds || '?'} bd/${payload.baths || '?'} ba${
+              payload.sqft ? `, ${payload.sqft} sq ft` : ''
+            }`,
+            voice: `${payload.beds || '?'} bedrooms, ${payload.baths || '?'} baths${
+              payload.sqft ? `, ${payload.sqft} square feet` : ''
+            }`,
+          },
+          {
+            shot: 'Exterior closing shot with text overlay',
+            text: `See more at ${addr}`,
+            voice: `See more at ${addr}`,
+          },
         ]
       : [],
     emailSubject: include('email')

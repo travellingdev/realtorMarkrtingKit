@@ -25,6 +25,18 @@ export function buildFacts(payload: Payload): Facts {
     tone: payload.tone?.trim(),
     brandVoice: payload.brandVoice?.trim(),
   } as Record<string, any>;
+  const parts = [
+    raw.beds && `${raw.beds} bed`,
+    raw.baths && `${raw.baths} bath`,
+    raw.propertyType,
+  ].filter(Boolean) as string[];
+  let summary = parts.join(' ');
+  if (raw.neighborhood) {
+    summary = summary
+      ? `${summary} in ${raw.neighborhood}`
+      : raw.neighborhood;
+  }
+  raw.summary = summary || undefined;
   return FactsSchema.parse(raw);
 }
 
@@ -35,7 +47,9 @@ function composeDraftMessages(facts: Facts, controls: Controls): ChatMessage[] {
     {
       role: 'system',
       content:
-        'You are a real-estate copywriter. Produce MLS-compliant, fair-housing-safe content. If photos or features are missing, invent neutral but realistic details. All fields must be non-empty. Output JSON only matching the schema exactly.',
+
+        'You are a real-estate copywriter. Produce MLS-compliant, fair-housing-safe content. Output JSON only matching the schema exactly. mlsDesc about 900 chars. igSlides 5-7 captions, each ≤110 chars. reelScript: array of three objects (Hook 0-3s, Middle 4-20s, CTA 21-30s); each object has shot, text, voice ≤200 chars. emailSubject ≤70 chars; emailBody ≤900 chars. All fields must be non-empty; invent neutral details if photos or features are missing.',
+
     },
     {
       role: 'user',
@@ -62,7 +76,7 @@ function composeCritiqueMessages(
     {
       role: 'system',
       content:
-        'You are a real-estate copywriter and critical editor. Ensure outputs comply with MLS and fair-housing rules. Output final JSON only.',
+        'You are a real-estate copywriter and critical editor. Ensure outputs comply with MLS and fair-housing rules. Keep structure: mlsDesc about 900 chars; igSlides 5-7 captions ≤110 chars; reelScript exactly three objects (Hook 0-3s, Middle 4-20s, CTA 21-30s) with shot, text, voice ≤200 chars; emailSubject ≤70 chars; emailBody ≤900 chars. All fields must be non-empty. Output final JSON only.',
     },
     {
       role: 'user',
@@ -75,10 +89,18 @@ function composeCritiqueMessages(
 function postProcess(o: Output): Output {
   const trim = (s: string) => s.trim();
   const cap = (s: string, n: number) => (s.length > n ? s.slice(0, n) : s);
+  const reelScript = (o.reelScript || [])
+    .map((seg) => ({
+      shot: trim(cap(seg.shot || '', 200)),
+      text: trim(cap(seg.text || '', 200)),
+      voice: trim(cap(seg.voice || '', 200)),
+    }))
+    .filter((seg) => seg.shot && seg.text && seg.voice)
+    .slice(0, 3);
   return {
     mlsDesc: trim(cap(o.mlsDesc || '', 900)),
     igSlides: (o.igSlides || []).map((s) => trim(cap(s, 110))).slice(0, 7),
-    reelScript: (o.reelScript || []).map((s) => trim(cap(s, 200))).slice(0, 3),
+    reelScript,
     emailSubject: trim(cap(o.emailSubject || '', 70)),
     emailBody: trim(cap(o.emailBody || '', 900)),
   };
@@ -90,7 +112,7 @@ function complianceScan(o: Output): string[] {
   const text = [
     o.mlsDesc,
     ...o.igSlides,
-    ...o.reelScript,
+    ...o.reelScript.flatMap((s) => [s.shot, s.text, s.voice]),
     o.emailSubject,
     o.emailBody,
   ]
@@ -106,7 +128,7 @@ function policyViolations(o: Output, policy: Controls['policy']): {
   const text = [
     o.mlsDesc,
     ...o.igSlides,
-    ...o.reelScript,
+    ...o.reelScript.flatMap((s) => [s.shot, s.text, s.voice]),
     o.emailSubject,
     o.emailBody,
   ]

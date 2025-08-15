@@ -5,7 +5,7 @@ export type { Payload };
 export type Outputs = {
   mlsDesc: string;
   igSlides: string[];
-  reelScript: string[];
+  reelScript: { shot: string; text: string; voice: string }[];
   emailSubject: string;
   emailBody: string;
 };
