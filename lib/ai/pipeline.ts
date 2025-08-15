@@ -626,10 +626,18 @@ function postProcess(o: Output, facts?: Facts, photoInsights?: PhotoInsights): O
     console.log('🎬 [VIDEO SCRIPT DEBUG] Raw reelScript:', o.reelScript);
     console.log('🎬 [VIDEO SCRIPT DEBUG] Number of segments:', o.reelScript.length);
     o.reelScript.forEach((segment, i) => {
-      console.log(`🎬 [VIDEO SCRIPT DEBUG] Segment ${i}:`, segment.substring(0, 100) + '...');
-      // Final check for SHOT presence
-      if (!segment.includes('SHOT:')) {
-        console.log('    ⚠️ FINAL WARNING: No SHOT in post-processed segment');
+      if (typeof segment === 'object' && segment.voice) {
+        console.log(`🎬 [VIDEO SCRIPT DEBUG] Segment ${i}: Object format - voice: ${segment.voice.substring(0, 50)}..., text: ${segment.text}, shot: ${segment.shot}`);
+        if (!segment.shot) {
+          console.log('    ⚠️ FINAL WARNING: No shot in object segment');
+        }
+      } else if (typeof segment === 'string') {
+        console.log(`🎬 [VIDEO SCRIPT DEBUG] Segment ${i}: String format -`, segment.substring(0, 100) + '...');
+        if (!segment.includes('SHOT:')) {
+          console.log('    ⚠️ FINAL WARNING: No SHOT in post-processed segment');
+        }
+      } else {
+        console.log(`🎬 [VIDEO SCRIPT DEBUG] Segment ${i}: Unexpected format -`, typeof segment);
       }
     });
   }

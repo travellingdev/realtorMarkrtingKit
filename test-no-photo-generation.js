@@ -33,7 +33,7 @@ async function testNoPhotoGeneration() {
   try {
     console.log('📝 Sending request to /api/generate...');
     
-    const response = await fetch('http://localhost:3006/api/generate', {
+    const response = await fetch('http://localhost:3008/api/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
