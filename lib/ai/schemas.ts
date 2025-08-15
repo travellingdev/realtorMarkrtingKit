@@ -45,11 +45,19 @@ export type Controls = z.infer<typeof ControlsSchema>;
 
 // Expected marketing outputs from the model.
 export const OutputSchema = z.object({
-  mlsDesc: z.string(),
-  igSlides: z.array(z.string()),
-  reelScript: z.array(z.string()),
-  emailSubject: z.string(),
-  emailBody: z.string(),
+  mlsDesc: z.string().min(1),
+  igSlides: z.array(z.string().min(1)).min(5).max(7),
+  reelScript: z
+    .array(
+      z.object({
+        shot: z.string().min(1),
+        text: z.string().min(1),
+        voice: z.string().min(1),
+      })
+    )
+    .length(3),
+  emailSubject: z.string().min(1),
+  emailBody: z.string().min(1),
 });
 export type Output = z.infer<typeof OutputSchema>;
 
@@ -57,11 +65,30 @@ export type Output = z.infer<typeof OutputSchema>;
 export const OutputJsonSchema = {
   type: 'object',
   properties: {
-    mlsDesc: { type: 'string' },
-    igSlides: { type: 'array', items: { type: 'string' } },
-    reelScript: { type: 'array', items: { type: 'string' } },
-    emailSubject: { type: 'string' },
-    emailBody: { type: 'string' },
+    mlsDesc: { type: 'string', minLength: 1 },
+    igSlides: {
+      type: 'array',
+      items: { type: 'string', minLength: 1 },
+      minItems: 5,
+      maxItems: 7,
+    },
+    reelScript: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          shot: { type: 'string', minLength: 1 },
+          text: { type: 'string', minLength: 1 },
+          voice: { type: 'string', minLength: 1 },
+        },
+        required: ['shot', 'text', 'voice'],
+        additionalProperties: false,
+      },
+      minItems: 3,
+      maxItems: 3,
+    },
+    emailSubject: { type: 'string', minLength: 1 },
+    emailBody: { type: 'string', minLength: 1 },
   },
   required: ['mlsDesc', 'igSlides', 'reelScript', 'emailSubject', 'emailBody'],
   additionalProperties: false,

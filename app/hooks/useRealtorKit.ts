@@ -279,9 +279,21 @@ export function useRealtorKit() {
       `DM "TOUR" for details`,
     ];
     const reelScript = [
-      `Hook (0–3s): If natural light matters to you, watch this.`,
-      `Middle (4–20s): ${beds || "?"} bd/${baths || "?"} ba${sqft ? `, ${sqft} sq ft` : ""}; open kitchen; ${toFeatureList[0] || "flex layout"}; primary suite; easy yard.`,
-      `CTA (21–30s): Open house Sat 11–1 at ${addr}. Comment "TOUR" and I'll DM details.`,
+      {
+        shot: 'Front exterior with quick zoom-in',
+        text: 'If natural light matters to you, watch this.',
+        voice: 'If natural light matters to you, watch this.',
+      },
+      {
+        shot: 'Pan through living area and kitchen',
+        text: `${beds || "?"} bd/${baths || "?"} ba${sqft ? `, ${sqft} sq ft` : ""}; ${toFeatureList[0] || "flex layout"}`,
+        voice: `${beds || "?"} bedrooms, ${baths || "?"} baths${sqft ? `, ${sqft} square feet` : ""}; ${toFeatureList[0] || "flex layout"}`,
+      },
+      {
+        shot: 'Street view with agent waving',
+        text: `Open house Sat 11–1 at ${addr}`,
+        voice: `Open house Saturday 11 to 1 at ${addr}. Comment "TOUR" for details`,
+      },
     ];
     const emailSubject = `Open House ${nearby ? `• ${nearby} ` : ""}${beds || "?"}BR`;
     const emailBody = `Hi there,\n\nWe're opening the doors at ${addr}. Quick look:\n\n• ${beds || "?"} bed / ${baths || "?"} bath${sqft ? ` • ${sqft} sq ft` : ""}\n• ${toFeatureList.length ? toFeatureList.slice(0, 4).join("\n• ") : "Bright, functional, great location"}\n• Near ${nearby} amenities\n\nOpen House: Sat 11–1\nReply to RSVP or request the full photo tour.\n\nBest,\nYour Realtor`;
