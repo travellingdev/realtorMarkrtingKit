@@ -33,7 +33,7 @@ function composeDraftMessages(facts: Facts, controls: Controls): ChatMessage[] {
     {
       role: 'system',
       content:
-        'You are a real-estate copywriter. Produce MLS-compliant, fair-housing-safe content. Output JSON only matching the schema exactly.',
+        'You are a real-estate copywriter. Produce MLS-compliant, fair-housing-safe content. Output JSON only matching the schema exactly. mlsDesc about 900 chars. igSlides 5-7 captions, each ≤110 chars. reelScript 3 lines (hook, body, CTA) ≤200 chars each. emailSubject ≤70 chars; emailBody ≤900 chars.',
     },
     {
       role: 'user',
@@ -60,7 +60,7 @@ function composeCritiqueMessages(
     {
       role: 'system',
       content:
-        'You are a real-estate copywriter and critical editor. Ensure outputs comply with MLS and fair-housing rules. Output final JSON only.',
+        'You are a real-estate copywriter and critical editor. Ensure outputs comply with MLS and fair-housing rules. Keep structure: mlsDesc about 900 chars; igSlides 5-7 captions ≤110 chars; reelScript 3 lines (hook, body, CTA) ≤200 chars each; emailSubject ≤70 chars; emailBody ≤900 chars. Output final JSON only.',
     },
     {
       role: 'user',
