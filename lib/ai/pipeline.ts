@@ -25,6 +25,18 @@ export function buildFacts(payload: Payload): Facts {
     tone: payload.tone?.trim(),
     brandVoice: payload.brandVoice?.trim(),
   } as Record<string, any>;
+  const parts = [
+    raw.beds && `${raw.beds} bed`,
+    raw.baths && `${raw.baths} bath`,
+    raw.propertyType,
+  ].filter(Boolean) as string[];
+  let summary = parts.join(' ');
+  if (raw.neighborhood) {
+    summary = summary
+      ? `${summary} in ${raw.neighborhood}`
+      : raw.neighborhood;
+  }
+  raw.summary = summary || undefined;
   return FactsSchema.parse(raw);
 }
 
