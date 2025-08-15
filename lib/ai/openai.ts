@@ -35,7 +35,7 @@ function buildPrompt(payload: Payload): string {
     '{',
     '  "mlsDesc": string  // <= 900 chars, MLS-safe, can include brand voice lightly',
     '  "igSlides": string[] // 5-7 short lines, <= 110 chars each',
-    '  "reelScript": string[] // exactly 3 lines: Hook (0-3s), Middle (4-20s), CTA (21-30s)',
+    '  "reelScript": { shot: string; text: string; voice: string; }[] // exactly 3 objects: Hook (0-3s), Middle (4-20s), CTA (21-30s)',
     '  "emailSubject": string // <= 70 chars',
     '  "emailBody": string // <= 900 chars, friendly, bullet list ok',
     '}',
@@ -82,7 +82,13 @@ export async function generateOutputsWithOpenAI(payload: Payload, plan: 'FREE' |
     const outputs: Outputs = {
       mlsDesc: String(parsed.mlsDesc || ''),
       igSlides: Array.isArray(parsed.igSlides) ? parsed.igSlides.map((x: any) => String(x)) : [],
-      reelScript: Array.isArray(parsed.reelScript) ? parsed.reelScript.map((x: any) => String(x)) : [],
+      reelScript: Array.isArray(parsed.reelScript)
+        ? parsed.reelScript.map((x: any) => ({
+            shot: String(x?.shot || ''),
+            text: String(x?.text || ''),
+            voice: String(x?.voice || ''),
+          }))
+        : [],
       emailSubject: String(parsed.emailSubject || ''),
       emailBody: String(parsed.emailBody || ''),
     };

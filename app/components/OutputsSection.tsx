@@ -60,7 +60,7 @@ export function getDisabledLabel(revealed: boolean, isLoggedIn: boolean) {
 }
 
 export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAll, onRequestAuth, handleReveal, kitSample, isLoggedIn, kitStatus }:{
-  outputs: null | { mlsDesc: string; igSlides: string[]; reelScript: string[]; emailSubject: string; emailBody: string };
+  outputs: null | { mlsDesc: string; igSlides: string[]; reelScript: { shot: string; text: string; voice: string }[]; emailSubject: string; emailBody: string };
   revealed: boolean;
   canCopyAll: boolean;
   onCopyAll: () => void;
@@ -126,11 +126,26 @@ export default function OutputsSection({ outputs, revealed, canCopyAll, onCopyAl
               <OutputCard
                 title="30-Second Reel Script"
                 icon={PlayCircle}
-                list={outputs?.reelScript}
+                list={outputs?.reelScript.map((seg, i) => {
+                  const labels = ['Hook', 'Middle', 'CTA'];
+                  const label = labels[i] || `Part ${i + 1}`;
+                  return `${label} — Shot: ${seg.shot}; Text: ${seg.text}; Voice: ${seg.voice}`;
+                })}
                 revealed={revealed}
                 canCopy={kitSample ? isLoggedIn : revealed}
                 disabledLabel={copyDisabledLabel}
-                onCopy={() => outputs && navigator.clipboard.writeText(outputs.reelScript.join('\n'))}
+                onCopy={() =>
+                  outputs &&
+                  navigator.clipboard.writeText(
+                    outputs.reelScript
+                      .map((seg, i) => {
+                        const labels = ['Hook', 'Middle', 'CTA'];
+                        const label = labels[i] || `Part ${i + 1}`;
+                        return `${label}\nShot: ${seg.shot}\nText: ${seg.text}\nVoice: ${seg.voice}`;
+                      })
+                      .join('\n\n')
+                  )
+                }
                 onRequestAuth={onRequestAuth}
               />
               <OutputCard
