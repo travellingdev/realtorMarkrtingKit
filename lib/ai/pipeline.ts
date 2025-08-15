@@ -28,12 +28,14 @@ export function buildFacts(payload: Payload): Facts {
   return FactsSchema.parse(raw);
 }
 
+// Compose the initial prompt instructing the model to fill gaps with neutral details
+// and ensure every field is populated.
 function composeDraftMessages(facts: Facts, controls: Controls): ChatMessage[] {
   return [
     {
       role: 'system',
       content:
-        'You are a real-estate copywriter. Produce MLS-compliant, fair-housing-safe content. Output JSON only matching the schema exactly.',
+        'You are a real-estate copywriter. Produce MLS-compliant, fair-housing-safe content. If photos or features are missing, invent neutral but realistic details. All fields must be non-empty. Output JSON only matching the schema exactly.',
     },
     {
       role: 'user',
