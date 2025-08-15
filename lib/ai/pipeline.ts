@@ -345,7 +345,7 @@ function composeDraftMessages(facts: Facts, controls: Controls, photoInsights?: 
       preview: photoContext.substring(0, 200) + '...'
     });
   } else {
-    console.log(`🚫 [CONTENT GENERATION] No photo insights available for content generation`);
+    console.log(`🚫 [CONTENT GENERATION] No photo context - this should not happen with property-based insights`);
   }
 
   const systemPrompt = [
@@ -400,7 +400,7 @@ function composeDraftMessages(facts: Facts, controls: Controls, photoInsights?: 
     `Property Facts: ${JSON.stringify(facts)}`,
     '',
     photoContext,
-    photoContext ? '' : 'No photos provided - use property facts only.',
+    photoContext ? '' : 'CRITICAL: No photos provided but property-based buyer psychology has been generated above - use it fully.',
     '',
     'Generation Controls:',
     channelInstructions,
@@ -938,25 +938,55 @@ export async function generateKit({
   const policy = controls.policy;
   let tokenCounts: TokenCounts = { prompt: 0, completion: 0, total: 0 };
   
-  // Analyze photos if provided (including hero analysis for Phase 1)
+  // Analyze photos if provided, or generate property-based insights if not
   let photoInsights: PhotoInsights | undefined;
   let heroAnalysis: any | undefined;
-  if (facts.photos && facts.photos.length > 0) {
-    try {
+  
+  try {
+    if (facts.photos && facts.photos.length > 0) {
       console.log('[pipeline] Analyzing photos...', { count: facts.photos.length });
       
-      // Only do photo analysis synchronously
-      // Hero analysis will be done asynchronously after generation
-      photoInsights = await analyzePhotosWithVision(facts.photos);
+      // Photo analysis with fallback to property facts
+      photoInsights = await analyzePhotosWithVision(facts.photos, 2, facts);
       console.log('[pipeline] Photo analysis complete', { 
         rooms: photoInsights.rooms.length,
         features: photoInsights.features.length 
       });
+    } else {
+      console.log('[pipeline] No photos provided - generating property-based insights...');
       
-      // Note: Hero analysis removed from here - will be async via /api/hero-status
-    } catch (error) {
-      console.warn('[pipeline] Photo analysis failed', error);
-      // Continue without photo insights
+      // Generate property-based insights when no photos available
+      photoInsights = await analyzePhotosWithVision([], 2, facts);
+      console.log('[pipeline] Property-based insights generated', { 
+        features: photoInsights.features.length,
+        conversionHooks: photoInsights.conversionHooks?.length || 0,
+        buyerProfile: photoInsights.buyerProfile,
+        propertyCategory: photoInsights.propertyCategory
+      });
+    }
+  } catch (error) {
+    console.warn('[pipeline] Analysis failed, continuing with basic insights', error);
+    // Don't leave photoInsights undefined - this is a key fix
+    if (!photoInsights) {
+      try {
+        photoInsights = await analyzePhotosWithVision([], 2, facts);
+      } catch (fallbackError) {
+        console.error('[pipeline] Even fallback insights failed', fallbackError);
+        // Last resort - create minimal insights
+        photoInsights = {
+          rooms: [],
+          features: facts.features.length ? facts.features : ['well-maintained property'],
+          style: ['residential'],
+          lighting: 'good',
+          condition: 'good',
+          sellingPoints: ['quality home'],
+          marketingAngles: ['great opportunity'],
+          mustMentionFeatures: facts.features.slice(0, 3),
+          headlineFeature: facts.features[0] || 'quality property',
+          propertyCategory: 'family',
+          marketingPriority: 'features'
+        };
+      }
     }
   }
   

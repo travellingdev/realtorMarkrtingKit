@@ -60,7 +60,8 @@ const ROOM_SCORES = {
 
 export async function analyzePhotosWithVision(
   photoUrls: string[],
-  maxRetries: number = 2
+  maxRetries: number = 2,
+  propertyFacts?: any // Add optional property facts for fallback
 ): Promise<PhotoInsights> {
   const startTime = Date.now();
   console.log(`🔍 [PHOTO ANALYSIS START] Processing ${photoUrls.length} photos`, {
@@ -69,7 +70,23 @@ export async function analyzePhotosWithVision(
   });
 
   if (!photoUrls.length) {
-    console.log(`❌ [PHOTO ANALYSIS] No photos provided - returning empty insights`);
+    console.log(`🏠 [PHOTO ANALYSIS] No photos provided - generating property-based insights`);
+    
+    // If we have property facts, generate intelligent insights
+    if (propertyFacts) {
+      const { generatePropertyBasedInsights } = await import('./propertyBasedInsights');
+      const insights = generatePropertyBasedInsights(propertyFacts);
+      console.log(`✨ [PHOTO ANALYSIS] Generated property-based insights:`, {
+        features: insights.features.length,
+        conversionHooks: insights.conversionHooks?.length || 0,
+        buyerProfile: insights.buyerProfile,
+        propertyCategory: insights.propertyCategory
+      });
+      return insights;
+    }
+    
+    // Fallback to basic empty insights if no property facts
+    console.log(`❌ [PHOTO ANALYSIS] No photos or property facts - returning minimal insights`);
     return {
       rooms: [],
       features: [],
