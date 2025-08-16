@@ -75,6 +75,71 @@ function validateEmailStructure(email: any): { valid: boolean; errors: string[] 
   return { valid: errors.length === 0, errors };
 }
 
+// Channel-specific prompt builders
+function buildMLSPrompt(facts: Facts, photoInsights?: PhotoInsights): string {
+  if (!facts.address && !facts.neighborhood) {
+    return ''; // Don't generate MLS without location info
+  }
+  
+  return `
+MLS DESCRIPTION REQUIREMENTS (900 chars max):
+- Opening: Emotional hook using "${photoInsights?.headlineFeature || 'property highlights'}"
+- Include: ${facts.beds || 'X'}BR/${facts.baths || 'X'}BA${facts.sqft ? `, ${facts.sqft}sqft` : ''}
+- Features to emphasize: ${photoInsights?.mustMentionFeatures?.slice(0, 5).join(', ') || facts.features?.join(', ') || 'property features'}
+- Lifestyle elements: ${photoInsights?.lifestyleElements?.join(', ') || 'comfortable living'}
+- SEO keywords: ${photoInsights?.mlsKeywords?.join(', ') || 'real estate, home for sale'}
+- Close with: Agent expertise + urgency to schedule showing
+- Style: Professional, search-optimized, emotionally engaging`;
+}
+
+function buildInstagramPrompt(facts: Facts, photoInsights?: PhotoInsights): string {
+  const hasPhotos = photoInsights?.rooms?.length > 0;
+  
+  return `
+INSTAGRAM CAROUSEL (5-7 slides, 110 chars each):
+Slide 1: POV hook or "${photoInsights?.conversionHooks?.[0] || 'attention-grabbing opening'}"
+Slide 2-4: Feature → Benefit pairs
+${hasPhotos ? 
+  `Reference visible: ${photoInsights.rooms.map(r => r.type).slice(0, 3).join(', ')}` : 
+  'Use lifestyle language and imagination triggers'}
+Slide 5: "Picture yourself..." scenario
+Final slide: Urgency + CTA (DM for tour)
+Style: Viral, engaging, benefit-focused`;
+}
+
+function buildReelPrompt(facts: Facts, photoInsights?: PhotoInsights): string {
+  const hasPhotos = photoInsights?.rooms?.length > 0;
+  
+  return `
+30-SECOND REEL SCRIPT (exactly 4 segments):
+[
+  {
+    "time": "[0-3s]",
+    "voice": "${photoInsights?.conversionHooks?.[0] || 'Hook that stops the scroll'}",
+    "text": "Short on-screen text",
+    "shot": "${hasPhotos ? 'Exterior or hero room' : 'Property stats animation'}"
+  },
+  {
+    "time": "[4-10s]",
+    "voice": "Property basics (beds/baths/features)",
+    "text": "${facts.beds || 'X'}BR • ${facts.baths || 'X'}BA",
+    "shot": "${hasPhotos ? 'Pan through main living areas' : 'Map zoom to neighborhood'}"
+  },
+  {
+    "time": "[11-20s]",
+    "voice": "Highlight top 2-3 features",
+    "text": "Key features",
+    "shot": "${hasPhotos ? 'Specific feature shots' : 'Feature list graphics'}"
+  },
+  {
+    "time": "[21-30s]",
+    "voice": "Call to action with urgency",
+    "text": "DM TOUR • ${facts.address ? 'Open Sat' : 'Schedule Today'}",
+    "shot": "${hasPhotos ? 'Best room + agent contact' : 'Contact info graphic'}"
+  }
+]`;
+}
+
 // Helper function to build bulletproof email prompt
 function buildBulletproofEmailPrompt(
   facts: Facts,
@@ -177,27 +242,64 @@ IMPORTANT: Generate a complete email even with minimal information. Never skip s
 Use what you have, infer what you can, and use smart defaults for the rest.`;
 }
 
-function composeDraftMessages(facts: Facts, controls: Controls, photoInsights?: PhotoInsights): ChatMessage[] {
-  // Map UI channel names to output field names
-  const channelMapping: Record<string, string[]> = {
-    'mls': ['mlsDesc'],
-    'instagram': ['igSlides'],
-    'reel': ['reelScript'],
-    'email': ['emailSubject', 'emailBody']
-  };
+// Build output schema based on selected channels
+function buildDynamicOutputSchema(selectedChannels: string[]): string {
+  const schemaLines: string[] = [];
   
-  // Build comprehensive instructions including all controls
-  const channelInstructions = controls.channels?.length 
-    ? (() => {
-        const outputFields = controls.channels.flatMap(ch => channelMapping[ch] || []);
-        const unselectedChannels = ['mls', 'instagram', 'reel', 'email'].filter(ch => !controls.channels.includes(ch));
-        const unselectedFields = unselectedChannels.flatMap(ch => channelMapping[ch] || []);
-        
-        return `IMPORTANT: Generate ONLY these outputs with content: ${outputFields.join(', ')}. 
-                CRITICAL: Set these outputs to EMPTY (empty string or empty array): ${unselectedFields.join(', ')}.
-                DO NOT generate content for unselected channels.`;
-      })()
-    : 'Generate all outputs (mlsDesc, igSlides, reelScript, emailSubject, emailBody).';
+  schemaLines.push('Generate ONLY the following outputs in JSON format:');
+  schemaLines.push('{');
+  
+  if (selectedChannels.includes('mls')) {
+    schemaLines.push('  "mlsDesc": string  // MLS description (900 chars max)');
+  }
+  
+  if (selectedChannels.includes('instagram')) {
+    schemaLines.push('  "igSlides": string[]  // Instagram carousel (5-7 slides, 110 chars each)');
+    schemaLines.push('  "igHashtags": {  // Categorized hashtags');
+    schemaLines.push('    "trending": string[],');
+    schemaLines.push('    "location": string[],');
+    schemaLines.push('    "features": string[],');
+    schemaLines.push('    "all": string[]');
+    schemaLines.push('  }');
+  }
+  
+  if (selectedChannels.includes('reel')) {
+    schemaLines.push('  "reelScript": [  // Exactly 4 segments');
+    schemaLines.push('    {');
+    schemaLines.push('      "time": "[0-3s]" | "[4-10s]" | "[11-20s]" | "[21-30s]",');
+    schemaLines.push('      "voice": string,  // Voiceover (max 200 chars)');
+    schemaLines.push('      "text": string,  // On-screen text (max 40 chars)');
+    schemaLines.push('      "shot": string  // Visual direction (max 100 chars)');
+    schemaLines.push('    }');
+    schemaLines.push('  ]');
+    schemaLines.push('  "reelHooks": string[]  // 3 alternative opening hooks');
+  }
+  
+  if (selectedChannels.includes('email')) {
+    schemaLines.push('  "emailSubject": string  // Subject line (60 chars max)');
+    schemaLines.push('  "emailBody": string  // Complete email with greeting and signature');
+    schemaLines.push('  "emailStructured": {  // Structured format');
+    schemaLines.push('    "subject": string,');
+    schemaLines.push('    "greeting": string,');
+    schemaLines.push('    "hook": string,');
+    schemaLines.push('    "valuePoints": [string, string, string],');
+    schemaLines.push('    "urgency": string,');
+    schemaLines.push('    "ctaPrimary": string,');
+    schemaLines.push('    "ctaSecondary": string,');
+    schemaLines.push('    "signature": string');
+    schemaLines.push('  }');
+  }
+  
+  schemaLines.push('}');
+  
+  return schemaLines.join('\n');
+}
+
+function composeDraftMessages(facts: Facts, controls: Controls, photoInsights?: PhotoInsights): ChatMessage[] {
+  // Determine selected channels (default to all if none specified)
+  const selectedChannels = controls.channels?.length > 0 
+    ? controls.channels 
+    : ['mls', 'instagram', 'reel', 'email'];
   
   const openHouseInfo = [
     controls.openHouseDate,
@@ -489,136 +591,88 @@ function composeDraftMessages(facts: Facts, controls: Controls, photoInsights?: 
   }
 
   const systemPrompt = [
-    'You are a master real-estate copywriter specializing in buyer psychology and conversion optimization.',
-    'Your goal: Transform property viewers into scheduled showings through emotional connection and urgency.',
+    'You are an expert real estate marketing copywriter.',
+    'Generate compelling, conversion-focused content for the requested channels only.',
     '',
-    '🧠 CONVERSION PSYCHOLOGY FRAMEWORK:',
-    '1. EMOTIONAL ENGAGEMENT: Every opening line must create immediate desire',
-    '2. LIFESTYLE VISUALIZATION: Help buyers see themselves living there',
-    '3. BENEFIT-FOCUSED: Translate features into emotional benefits and outcomes',
-    '4. URGENCY CREATION: Use scarcity and opportunity to drive immediate action',
-    '5. SOCIAL PROOF: Build credibility and reduce buyer risk/hesitation',
+    'CORE PRINCIPLES:',
+    '• Create emotional connection in opening lines',
+    '• Focus on benefits, not just features',
+    '• Use specific details when available, lifestyle language when not',
+    '• Include clear calls-to-action',
+    '• Maintain compliance (Fair Housing, no protected classes)',
     '',
-    '🎯 CONTENT STRATEGY BY CHANNEL:',
-    '• MLS: SEO-optimized emotional hook + lifestyle scenarios + agent positioning + urgency',
-    '• Instagram: VIRAL ENGAGEMENT - POV hooks + feature/benefit mapping + lifestyle scenarios + engagement bait',
-    '  CRITICAL: Use "POV:", "Tell me you wouldn\'t...", "This house just hits different" format',
-    '  CRITICAL: Each slide must hook attention and create desire for next step',
-    '• Email: ADAPTIVE INTEL/EMOTION - Use concrete data when available, emotional hooks when not',
-    '  CRITICAL: NEVER invent facts - use only provided information',
-    '  CRITICAL: Intel-first strategy: specific numbers > lifestyle benefits > generic language',
-    '  CRITICAL: One clear CTA - make response friction-free',
-    '• LinkedIn: PROFESSIONAL AUTHORITY - Market insights + thought leadership + networking opportunities',
-    '  CRITICAL: Demonstrate expertise through data-driven insights and professional credibility',
-    '  CRITICAL: Engage industry peers and potential high-value clients through valuable content',
-    '• Facebook: COMMUNITY ENGAGEMENT - Lifestyle appeal + local expertise + approachable professionalism',
-    '  CRITICAL: Balance professional credibility with community connection and accessibility',
-    '• YouTube: EDUCATIONAL AUTHORITY - Detailed property tours + market insights + subscriber building',
-    '  CRITICAL: Provide valuable education while showcasing expertise and building long-term audience',
-    '• TikTok: VIRAL ENGAGEMENT - Quick hooks + trending formats + maximum shareability',
-    '  CRITICAL: First 3 seconds must grab attention, use trending audio and effects for algorithm boost',
-    '• Shorts: ATTENTION OPTIMIZATION - Fast-paced reveals + vertical format + loop potential',
-    '  CRITICAL: Design for mobile viewing with bold visuals and quick retention tactics',
+    'CHANNEL GUIDELINES:',
+    '• MLS: Professional, SEO-optimized, emotionally engaging',
+    '• Instagram: Viral hooks, visual storytelling, engagement-focused',
+    '• Reel: Dynamic 30-second script with clear structure',
+    '• Email: Personal, benefit-driven, clear next steps',
     '',
-    '🚫 FORBIDDEN APPROACHES:',
-    '❌ Dry, factual descriptions that sound like specifications',
-    '❌ Generic language that could apply to any property',
-    '❌ Weak, passive language that lacks conviction',
-    '❌ Missing calls-to-action or next steps',
-    '',
-    '✅ CONVERSION REQUIREMENTS:',
-    '✓ First sentence creates immediate emotional connection',
-    '✓ Buyer can visualize their lifestyle transformation',  
-    '✓ Benefits clearly stated, not just features mentioned',
-    '✓ Urgency/scarcity drives immediate action',
-    '✓ Clear, low-friction next step provided',
-    '',
-    'COMPLIANCE: MLS compliant, Fair Housing safe, no protected classes.'
+    'IMPORTANT: Generate ONLY the content requested. Follow the specific format provided.'
   ].join('\n');
   
-  // Add context-aware shot instructions
-  const shotInstructions = photoInsights && photoInsights.rooms?.length > 0
-    ? 'For "shot" field: Use specific camera movements like "Pan across living room", "Close-up of kitchen island", "Exterior establishing shot"'
-    : 'For "shot" field: Use conceptual visuals like "Property stats animation", "Map zoom to neighborhood", "Agent speaking to camera", "Feature list graphic"';
-
-  // Build bulletproof email prompt
-  const emailPrompt = buildBulletproofEmailPrompt(facts, controls, photoInsights);
+  // Build channel-specific prompts based on selection
+  const channelPrompts: string[] = [];
+  
+  // Add base context that all channels need
+  const baseContext = `
+PROPERTY CONTEXT:
+- Address: ${facts.address || 'Not provided'}
+- Configuration: ${facts.beds || 'X'}BR/${facts.baths || 'X'}BA${facts.sqft ? `, ${facts.sqft}sqft` : ''}
+- Features: ${facts.features?.join(', ') || 'See property details'}
+- Brand Voice: ${facts.brandVoice || 'Professional'}
+${photoInsights ? `- Photo Analysis: ${photoInsights.rooms.length} rooms analyzed` : '- No photos provided'}
+`;
+  
+  // Only add prompts for selected channels
+  if (selectedChannels.includes('mls')) {
+    channelPrompts.push(buildMLSPrompt(facts, photoInsights));
+  }
+  
+  if (selectedChannels.includes('instagram')) {
+    channelPrompts.push(buildInstagramPrompt(facts, photoInsights));
+  }
+  
+  if (selectedChannels.includes('reel')) {
+    channelPrompts.push(buildReelPrompt(facts, photoInsights));
+  }
+  
+  if (selectedChannels.includes('email')) {
+    channelPrompts.push(buildBulletproofEmailPrompt(facts, controls, photoInsights));
+  }
+  
+  // Build the dynamic output schema
+  const outputSchema = buildDynamicOutputSchema(selectedChannels);
   
   const userPrompt = [
-    `Property Facts: ${JSON.stringify(facts)}`,
+    'TASK: Generate real estate marketing content for the selected channels.',
     '',
-    photoContext,
-    photoContext ? '' : 'CRITICAL: No photos provided but property-based buyer psychology has been generated above - use it fully.',
+    baseContext,
     '',
-    'Generation Controls:',
-    channelInstructions,
+    photoContext ? '📸 PHOTO INSIGHTS AVAILABLE:' : '📝 TEXT-ONLY GENERATION MODE:',
+    photoContext || 'Focus on property details and lifestyle benefits. Use "imagine" and "picture yourself" language.',
+    '',
+    'GENERATION CONTROLS:',
     openHouseInfo ? `Open House: ${openHouseInfo}` : '',
     ctaInstruction,
     controls.socialHandle ? `Social: ${controls.socialHandle}` : '',
-    controls.hashtagStrategy ? `Hashtags: ${controls.hashtagStrategy}` : '',
-    controls.extraHashtags ? `Extra tags: ${controls.extraHashtags}` : '',
-    controls.readingLevel ? `Reading level: ${controls.readingLevel}` : '',
     controls.useEmojis ? 'Include appropriate emojis' : 'No emojis',
-    controls.mlsFormat ? `MLS format: ${controls.mlsFormat}` : '',
+    controls.readingLevel ? `Reading level: ${controls.readingLevel}` : '',
     controls.policy?.mustInclude?.length ? `Must include words: ${controls.policy.mustInclude.join(', ')}` : '',
     controls.policy?.avoidWords?.length ? `Avoid words: ${controls.policy.avoidWords.join(', ')}` : '',
     '',
-    'JSON Output Schema:',
-    '{',
-    '  "mlsDesc": string  // MLS description, respect format preference',
-    '  "igSlides": string[]  // Instagram carousel slides',  
-    '  "reelScript": [  // EXACTLY 4 objects, one for each time segment',
-    '    {',
-    '      "time": "[0-3s]",  // MUST be exactly this value',
-    '      "voice": "Hook that stops the scroll (max 200 chars)",',
-    '      "text": "On-screen text (max 40 chars)",',
-    '      "shot": "Camera/visual direction (max 100 chars)"',
-    '    },',
-    '    {',
-    '      "time": "[4-10s]",  // MUST be exactly this value',
-    '      "voice": "Property basics narration (max 200 chars)",',
-    '      "text": "3BR • 2BA • 2000sqft (max 40 chars)",',
-    '      "shot": "Visual element (max 100 chars)"',
-    '    },',
-    '    {',
-    '      "time": "[11-20s]",  // MUST be exactly this value',
-    '      "voice": "Feature highlights (max 200 chars)",',
-    '      "text": "Key features (max 40 chars)",',
-    '      "shot": "Visual element (max 100 chars)"',
-    '    },',
-    '    {',
-    '      "time": "[21-30s]",  // MUST be exactly this value',
-    '      "voice": "Call to action (max 200 chars)",',
-    '      "text": "DM TOUR • Open Sat (max 40 chars)",',
-    '      "shot": "Closing visual (max 100 chars)"',
-    '    }',
-    '  ],',
-    '  "reelHooks": string[]  // 3 alternative opening hooks',
-    '  "emailSubject": string  // Email subject line (60 chars max)',
-    '  "emailBody": string  // COMPLETE email with greeting and signature',
-    '  "emailStructured": {  // NEW: Structured email for consistency',
-    '    "subject": string  // 10-60 chars, include best detail + address',
-    '    "greeting": string  // "Hi there" or "Hi [Name]"',
-    '    "hook": string  // 10-200 chars, creates desire',
-    '    "valuePoints": [string, string, string]  // EXACTLY 3 value points',
-    '    "urgency": string  // 5-150 chars, authentic reason to act',
-    '    "ctaPrimary": string  // 3-50 chars, main action',
-    '    "ctaSecondary": string  // Secondary CTA, usually "Reply with questions"',
-    '    "signature": string  // Professional closing',
-    '  }',
-    '}',
+    '═══════════════════════════════════════════',
+    'CHANNEL-SPECIFIC REQUIREMENTS:',
+    '═══════════════════════════════════════════',
     '',
-    'CRITICAL REEL REQUIREMENTS:',
-    '• reelScript MUST be an array of EXACTLY 4 objects',
-    '• Each object MUST have ALL fields: time, voice, text, shot',
-    '• NO empty strings - all fields required',
-    '• time values MUST be: "[0-3s]", "[4-10s]", "[11-20s]", "[21-30s]"',
-    '• text field is ON-SCREEN TEXT (like captions), keep it SHORT',
-    shotInstructions,
+    ...channelPrompts.filter(Boolean),
     '',
-    emailPrompt,
+    '═══════════════════════════════════════════',
+    'OUTPUT FORMAT:',
+    '═══════════════════════════════════════════',
     '',
-    'Set any non-requested channel outputs to empty string/array.'
+    outputSchema,
+    '',
+    'CRITICAL: Generate ONLY the requested outputs above. Do not include outputs for unselected channels.'
   ].filter(Boolean).join('\n');
 
   // Debug logging to check reel format instructions
